@@ -1,7 +1,8 @@
 import os
 import sys; sys.path.append("../")
 import pandas as pd
-
+import pyspark
+from pyspark.ml.feature import Imputer, StringIndexer
 
 def split_data():
     '''
@@ -19,7 +20,7 @@ def split_data():
     test.to_csv('../Dataset/test.csv', index=False)
 
 
-def read_data(kind='train', features='all', encode=None, drop_cols=[]):
+def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
     
     '''
     Read the dataset and return a dataframe 
@@ -32,78 +33,94 @@ def read_data(kind='train', features='all', encode=None, drop_cols=[]):
     elif kind == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
     else:                   path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
 
-    df = pd.read_csv(path)
-    
-    # drop useless columns
-    if len(drop_cols) > 0:
-        df = df.drop(drop_cols, axis=1) 
+
+    df = spark.read.csv(path, header=True, inferSchema= True)
     
     # extract the categorical fetaures only 
-    if features==' Categorical':
-        categ_features =[col for col in df.columns if type(df.iloc[0, df.columns.get_loc(col)]) == str] 
-        df= df[categ_features] 
+    numerical_cols= ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs","Price"]
+
+    if features=='Categorical':
+        # categoricalCols =[col[0] for col in df.dtypes if col[1].startswith('string') or\
+        #                   col[1].startswith('boolean') or col[1].startswith('date') or\
+        #                   col[1].startswith('timestamp')] 
+        
+        # df = df.select(categoricalCols)
+        df= df.select([column for column in df.columns if column not in numerical_cols])
+        
     
     # extract the numerical fetaures only
-    elif features==' Numerical':
-        num_features = [col for col in df.columns if type(df.iloc[0, df.columns.get_loc(col)]) != str] 
-        df= df[num_features]
-        for col in df.columns:
-            df[col] = df[col].astype(float)
+    elif features=='Numerical':
+        # numericCols = [col[0] for col in df.dtypes if col[1].startswith('int') or\
+        #                col[1].startswith('double') or col[1].startswith('float')]
+        # df = df.select(numericCols)
+        df= df.select(numerical_cols)
+        df= df.withColumn("Rating", df["Rating"].cast("float"))
+        df= df.withColumn("Rating Count", df["Rating Count"].cast("int"))
+        df= df.withColumn("Minimum Installs", df["Minimum Installs"].cast("int"))
+        df= df.withColumn("Maximum Installs", df["Maximum Installs"].cast("int"))
+        df= df.withColumn("Price", df["Price"].cast("float"))
 
-    # encode the categorical features
-    if encode == 'label':
+   
+    # encode the categorical features 
+    if encode :
         for col in df.columns:
             if type(df.iloc[0, df.columns.get_loc(col)]) == str:
-                df[col] = df[col].astype('category')
-                df[col] = pd.factorize(df[col])[0]
+                indexer = StringIndexer(inputCol=col, outputCol=col+"_index")
+                df = indexer.fit(df).transform(df)
+                df = df.drop(col, axis=1) 
 
-    elif encode == 'oneHot':
-        for col in df.columns:
-            if type(df.iloc[0, df.columns.get_loc(col)]) == str:
-                df = pd.concat([df, pd.get_dummies(df[col], prefix=col)], axis=1)
-                df = df.drop(col, axis=1)
-
+    # drop useless columns 
+    if len(drop_cols) > 0:
+        df = df.drop(*drop_cols) 
 
     return df
 
 
-def missing_values(df, treatment='drop'):
+def missing_values(df, treatment='drop', cols=[]):
     '''
     Dealing with the missing values in the dataset
     '''
+
     
-    print(f'Total Number of rows : {len(df)}')
+    print(f'Total Number of rows : {df.count()}')
     
     # get #rows with missing values 
-    print(f'Number of rows with missing values: {df.isnull().any(axis=1).sum()}')
+    for col in df.columns:
+        df = df.withColumn(col, df[col].cast("string"))
+    df_missing = df.filter(df[col].isNull()).count()
+    print(f'Number of rows with missing values: {df_missing}')
 
     if treatment=='drop':
-        df = df.dropna()
-        print(f'Number of rows after dropping: {len(df)}') 
+        df = df.na.drop()
+        print(f'Number of rows after dropping: {df.count()}') 
+        return df
 
-    elif treatment=='mean':
-        for col in df.columns:
-            df[col] = df[col].fillna(df[col].mean())
+    imputer = Imputer(inputCols=cols, outputCols=["{}_imputed".format(c) for c in cols])
+
+    if treatment=='mean':
+        imputer.setStrategy("mean")
 
     elif treatment=='median':
-        for col in df.columns:
-            df[col] = df[col].fillna(df[col].median())
+        imputer.setStrategy("median")
 
     elif treatment=='mode':
-        for col in df.columns:
-            df[col] = df[col].fillna(df[col].mode()[0])
+        imputer.setStrategy("mode")        
 
     elif treatment== 'interpolate':
-        df = df.interpolate(method='linear', axis=0).ffill().bfill()
+        imputer.setStrategy("interpolate")
 
+    df = imputer.fit(df).transform(df)
     return df
+
 
 def get_info(df):
     '''
     Get the info of the dataset
     '''
-    print(f'Number of rows: {len(df)}, Number of columns: {len(df.columns)}')
-    print(f'Available Features: {df.columns.tolist()}')
+    print(f'Number of rows: {df.count()}, Number of columns: {len(df.columns)}')
+    print(f'Available features: {df.columns}')
+
+    df.describe().show()
 
 
 def detect_outliers(df, col):
@@ -112,19 +129,20 @@ def detect_outliers(df, col):
     '''
 
     # calculate interquartile range (IQR)
-    q1 = df[col].quantile(0.25)
-    q3 = df[col].quantile(0.75)
+    q1 = df.approxQuantile(col, [0.25], 0.0)[0]
+    q3 = df.approxQuantile(col, [0.75], 0.0)[0]
 
-    iqr = q3 - q1 
+    iqr= q3 - q1
 
     # calculate the lower and upper bound
-    lower_bound = q1 - (1.5 * iqr) 
+    lower_bound = q1 - (1.5 * iqr)
     upper_bound = q3 + (1.5 * iqr)
 
-    # get the number of outliers
-    outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)]
+    # get the number of outliers 
+    outliers = df.filter((df[col] < lower_bound) | (df[col] > upper_bound))
+    
     # outliers_index = outliers.index
-    num_outliers = len(outliers)
+    num_outliers = outliers.count()
 
     print(f'Number of outliers in {col}: {num_outliers}')
 
