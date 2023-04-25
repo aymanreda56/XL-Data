@@ -24,6 +24,13 @@ def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
     
     '''
     Read the dataset and return a dataframe 
+
+
+    kind: 'train', 'val', 'test', 'all' ----> all is the default
+    features: 'all', 'Categorical', 'Numerical' ----> all is the default
+    encode: True, False (encode categorical features) 
+    drop_cols: list of columns to drop
+    
     TODO: return x_data and y_data instead of the whole dataframe
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
@@ -36,24 +43,17 @@ def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
 
     df = spark.read.csv(path, header=True, inferSchema= True)
     
-    # extract the categorical fetaures only 
     numerical_cols= ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs","Price"]
 
+    # extract the categorical fetaures only 
     if features=='Categorical':
-        # categoricalCols =[col[0] for col in df.dtypes if col[1].startswith('string') or\
-        #                   col[1].startswith('boolean') or col[1].startswith('date') or\
-        #                   col[1].startswith('timestamp')] 
-        
-        # df = df.select(categoricalCols)
         df= df.select([column for column in df.columns if column not in numerical_cols])
         
     
     # extract the numerical fetaures only
     elif features=='Numerical':
-        # numericCols = [col[0] for col in df.dtypes if col[1].startswith('int') or\
-        #                col[1].startswith('double') or col[1].startswith('float')]
-        # df = df.select(numericCols)
         df= df.select(numerical_cols)
+        
         df= df.withColumn("Rating", df["Rating"].cast("float"))
         df= df.withColumn("Rating Count", df["Rating Count"].cast("int"))
         df= df.withColumn("Minimum Installs", df["Minimum Installs"].cast("int"))
@@ -63,11 +63,14 @@ def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
    
     # encode the categorical features 
     if encode :
+        cols_to_drop=[]
         for col in df.columns:
-            if type(df.iloc[0, df.columns.get_loc(col)]) == str:
+            if col not in numerical_cols:
                 indexer = StringIndexer(inputCol=col, outputCol=col+"_index")
-                df = indexer.fit(df).transform(df)
-                df = df.drop(col, axis=1) 
+                df = indexer.setHandleInvalid("keep").fit(df).transform(df) 
+                cols_to_drop.append(col)
+
+        df = df.drop(*cols_to_drop)
 
     # drop useless columns 
     if len(drop_cols) > 0:
@@ -80,7 +83,6 @@ def missing_values(df, treatment='drop', cols=[]):
     '''
     Dealing with the missing values in the dataset
     '''
-
     
     print(f'Total Number of rows : {df.count()}')
     
