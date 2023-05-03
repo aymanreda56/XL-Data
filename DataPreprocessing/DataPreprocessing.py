@@ -1,19 +1,20 @@
 import os
 import sys; sys.path.append("../")
+from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
+
+
 
 def split_data():
     '''
     Split the dataset into train, validation and test set with ratio 60:20:20
     '''
     df = pd.read_csv('../Dataset/Google-Playstore.csv')
-    df = df.sample(frac=1).reset_index(drop=True)
 
-    train = df[:int(0.6*len(df))]
-    val = df[int(0.6*len(df)):int(0.8*len(df))]
-    test = df[int(0.8*len(df)):]
+    train_test,val=  train_test_split(df, test_size=0.2)
+    train,test= train_test_split(train_test, test_size=0.25)
 
     train.to_csv('../Dataset/train.csv', index=False)
     val.to_csv('../Dataset/val.csv', index=False)
@@ -108,8 +109,8 @@ def missing_values(df, treatment='drop', cols=[]):
     elif treatment=='mode':
         imputer.setStrategy("mode")        
 
-    elif treatment== 'interpolate':
-        imputer.setStrategy("interpolate")
+    # elif treatment== 'interpolate':
+    #     imputer.setStrategy("interpolate")
 
     df = imputer.fit(df).transform(df)
     return df
@@ -147,5 +148,3 @@ def detect_outliers(df, col):
     num_outliers = outliers.count()
 
     print(f'Number of outliers in {col}: {num_outliers}')
-
-
