@@ -166,6 +166,8 @@ def remove_commas(df):
     '''
     for col in df.columns:  
         col_type= df[col].dtypes
+        if col_type=='bool':
+            continue
 
         if col_type!='object':
             df[col] = df[col].astype(str)
