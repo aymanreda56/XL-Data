@@ -21,6 +21,18 @@ def split_data():
     test.to_csv('../Dataset/test.csv', index=False)
 
 
+def replace_delimiters(delimiter, spark=None, kind='Google-Playstore'):
+    if spark!=None:
+        df= read_data(spark, kind=kind)
+        df.write.options(header=True, delimiter=delimiter).csv('../Dataset/'+kind+'RDD')
+    else: 
+        dir= os.path.dirname(os.path.realpath(__file__))
+        path= os.path.join(dir, '../Dataset/'+kind+'.csv')
+        new_path= os.path.join(dir, '../Dataset/'+kind+'RDD.csv')
+
+        df= pd.read_csv(path,on_bad_lines='skip')
+        df.to_csv(new_path, index=False, sep=delimiter)
+
 def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
     
     '''
