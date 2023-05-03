@@ -6,7 +6,6 @@ import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
 
 
-
 def split_data():
     '''
     Split the dataset into train, validation and test set with ratio 60:20:20
@@ -20,18 +19,6 @@ def split_data():
     val.to_csv('../Dataset/val.csv', index=False)
     test.to_csv('../Dataset/test.csv', index=False)
 
-
-def replace_delimiters(delimiter, spark=None, kind='Google-Playstore'):
-    if spark!=None:
-        df= read_data(spark, kind=kind)
-        df.write.options(header=True, delimiter=delimiter).csv('../Dataset/'+kind+'RDD')
-    else: 
-        dir= os.path.dirname(os.path.realpath(__file__))
-        path= os.path.join(dir, '../Dataset/'+kind+'.csv')
-        new_path= os.path.join(dir, '../Dataset/'+kind+'RDD.csv')
-
-        df= pd.read_csv(path,on_bad_lines='skip')
-        df.to_csv(new_path, index=False, sep=delimiter)
 
 def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
     
@@ -156,7 +143,60 @@ def detect_outliers(df, col):
     # get the number of outliers 
     outliers = df.filter((df[col] < lower_bound) | (df[col] > upper_bound))
     
-    # outliers_index = outliers.index
+    outliers_index = outliers.index
     num_outliers = outliers.count()
 
     print(f'Number of outliers in {col}: {num_outliers}')
+    return outliers_index
+    
+
+def remove_outliers(df, col):
+    outliers_index= detect_outliers(df, col)
+    df = df.drop(outliers_index)
+    return df
+
+
+#--------------------------------------------------------------------------
+          
+def remove_commas(df):
+    '''
+    Remove commas from a column to make only commas be for separating columns.
+    Mainly for RDD purposes.
+
+    '''
+    for col in df.columns:  
+        col_type= df[col].dtypes
+
+        if col_type!='object':
+            df[col] = df[col].astype(str)
+
+        if col=='Installs':
+            df[col] = df[col].str.replace(',', '')
+        else:
+            
+            df[col] = df[col].str.replace(',', ' ')
+
+        df[col]= df[col].astype(col_type)
+
+    return df
+
+    
+
+def delimiter_to_comma(file_name='Google-Playstore'):
+    df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
+    df_new= remove_commas(df)
+    df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
+
+
+# def replace_delimiters(delimiter, spark=None, kind='Google-Playstore'):
+#     if spark!=None:
+#         df= read_data(spark, kind=kind)
+#         df.write.options(header=True, delimiter=delimiter).csv('../Dataset/'+kind+'RDD')
+#     else: 
+#         dir= os.path.dirname(os.path.realpath(__file__))
+#         path= os.path.join(dir, '../Dataset/'+kind+'.csv')
+#         new_path= os.path.join(dir, '../Dataset/'+kind+'RDD.xlsx')
+
+#         df= pd.read_csv(path)
+#         df.to_csv(new_path, index=False, sep=delimiter)
+
