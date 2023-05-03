@@ -20,13 +20,13 @@ def split_data():
     test.to_csv('../Dataset/test.csv', index=False)
 
 
-def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
+def read_data(spark, file_name='train', features='all', encode=False, drop_cols=[]):
     
     '''
     Read the dataset and return a dataframe 
 
 
-    kind: 'train', 'val', 'test', 'all' ----> all is the default
+    file_name: 'train', 'val', 'test', 'all' ----> all is the default
     features: 'all', 'Categorical', 'Numerical' ----> all is the default
     encode: True, False (encode categorical features) 
     drop_cols: list of columns to drop
@@ -35,9 +35,9 @@ def read_data(spark, kind='train', features='all', encode=False, drop_cols=[]):
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
 
-    if kind == 'train':     path= os.path.join(dir, '../Dataset/train.csv')
-    elif kind == 'val':     path= os.path.join(dir, '../Dataset/val.csv')
-    elif kind == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
+    if file_name == 'train':     path= os.path.join(dir, '../Dataset/train.csv')
+    elif file_name == 'val':     path= os.path.join(dir, '../Dataset/val.csv')
+    elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
     else:                   path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
 
 
@@ -180,6 +180,9 @@ def remove_commas(df):
 
         df[col]= df[col].astype(col_type)
 
+        if col=='Minimum Installs':
+            df[col]= df[col].astype('Int64')
+
     return df
 
     
@@ -188,17 +191,4 @@ def delimiter_to_comma(file_name='Google-Playstore'):
     df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
     df_new= remove_commas(df)
     df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
-
-
-# def replace_delimiters(delimiter, spark=None, kind='Google-Playstore'):
-#     if spark!=None:
-#         df= read_data(spark, kind=kind)
-#         df.write.options(header=True, delimiter=delimiter).csv('../Dataset/'+kind+'RDD')
-#     else: 
-#         dir= os.path.dirname(os.path.realpath(__file__))
-#         path= os.path.join(dir, '../Dataset/'+kind+'.csv')
-#         new_path= os.path.join(dir, '../Dataset/'+kind+'RDD.xlsx')
-
-#         df= pd.read_csv(path)
-#         df.to_csv(new_path, index=False, sep=delimiter)
 
