@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
-
+from pyspark.sql.functions import regexp_replace,isnull 
 
 def split_data():
     '''
@@ -20,7 +20,7 @@ def split_data():
     test.to_csv('../Dataset/test.csv', index=False)
 
 
-def read_data(spark, file_name='train', features='all', encode=False, drop_cols=[]):
+def read_data(spark, file_name='all', features='all', encode=False):
     
     '''
     Read the dataset and return a dataframe 
@@ -28,9 +28,7 @@ def read_data(spark, file_name='train', features='all', encode=False, drop_cols=
 
     file_name: 'train', 'val', 'test', 'all' ----> all is the default
     features: 'all', 'Categorical', 'Numerical' ----> all is the default
-    encode: True, False (encode categorical features) 
-    drop_cols: list of columns to drop
-    
+    encode: True, False (encode categorical features)     
     TODO: return x_data and y_data instead of the whole dataframe
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
@@ -72,10 +70,14 @@ def read_data(spark, file_name='train', features='all', encode=False, drop_cols=
 
         df = df.drop(*cols_to_drop)
 
-    # drop useless columns 
-    if len(drop_cols) > 0:
-        df = df.drop(*drop_cols) 
+    return df
 
+
+def remove_useless_col(df, cols=[]):
+    '''
+    Remove the useless columns from the dataset
+    '''
+    df = df.drop(*cols) 
     return df
 
 
@@ -86,12 +88,11 @@ def missing_values(df, treatment='drop', cols=[]):
     
     print(f'Total Number of rows : {df.count()}')
     
-    # get #rows with missing values 
-    for col in df.columns:
-        df = df.withColumn(col, df[col].cast("string"))
-    df_missing = df.filter(df[col].isNull()).count()
-    print(f'Number of rows with missing values: {df_missing}')
-
+    # get #rows with missing values in sny of its columns 
+    #TODO: fix this
+    # df_miss = df.filter(isnull(df).any())
+    # print(f'Number of rows with missing values: {df_miss.count()}')
+    
     if treatment=='drop':
         df = df.na.drop()
         print(f'Number of rows after dropping: {df.count()}') 
@@ -156,6 +157,30 @@ def remove_outliers(df, col):
     return df
 
 
+def handle_size_col(df):
+    '''
+    Since size is in G/M/K, we can convert it to be totally numerical for ease of analysis
+    '''
+
+    df_size= df.filter(df.Size == 'Varies with device').count()
+    print(f'Percentage of apps with size "Varies with device": {(df_size/df.count())*100} %')
+
+    # remove the 'Varies with device' value
+    df_filtered = df.filter(df.Size != 'Varies with device')
+
+    # remove the 'G', 'M' and 'k' from the values
+    df_filtered = df_filtered.withColumn('Size', regexp_replace('Size', 'G', '000000000'))
+    df_filtered = df_filtered.withColumn('Size', regexp_replace('Size', 'M', '000000'))
+    df_filtered = df_filtered.withColumn('Size', regexp_replace('Size', 'k', '000'))   
+
+    print("Converted all sizes to Bytes.")
+
+def currency_col(df):
+    currency_col = df.select('Currency')
+    currency_counts = currency_col.groupBy('Currency').count().sort('count', ascending=False)
+    currency_counts.show()
+
+
 #--------------------------------------------------------------------------
           
 def remove_commas(df):
@@ -185,10 +210,8 @@ def remove_commas(df):
 
     return df
 
-    
 
 def delimiter_to_comma(file_name='Google-Playstore'):
     df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
     df_new= remove_commas(df)
     df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
-
