@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
-from pyspark.sql.functions import regexp_replace,isnull 
+from pyspark.sql.functions import regexp_replace 
 
 def split_data():
     '''
@@ -36,7 +36,7 @@ def read_data(spark, file_name='all', features='all', encode=False):
     if file_name == 'train':     path= os.path.join(dir, '../Dataset/train.csv')
     elif file_name == 'val':     path= os.path.join(dir, '../Dataset/val.csv')
     elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
-    else:                   path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
+    else:                        path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
 
 
     df = spark.read.csv(path, header=True, inferSchema= True)
@@ -166,12 +166,12 @@ def handle_size_col(df):
     print(f'Percentage of apps with size "Varies with device": {(df_size/df.count())*100} %')
 
     # remove the 'Varies with device' value
-    df_filtered = df.filter(df.Size != 'Varies with device')
+    df = df.filter(df.Size != 'Varies with device')
 
     # remove the 'G', 'M' and 'k' from the values
-    df_filtered = df_filtered.withColumn('Size', regexp_replace('Size', 'G', '000000000'))
-    df_filtered = df_filtered.withColumn('Size', regexp_replace('Size', 'M', '000000'))
-    df_filtered = df_filtered.withColumn('Size', regexp_replace('Size', 'k', '000'))   
+    df = df.withColumn('Size', regexp_replace('Size', 'G', '000000000'))
+    df = df.withColumn('Size', regexp_replace('Size', 'M', '000000'))
+    df = df.withColumn('Size', regexp_replace('Size', 'k', '000'))   
 
     print("Converted all sizes to Bytes.")
 
