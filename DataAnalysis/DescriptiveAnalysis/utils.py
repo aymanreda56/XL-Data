@@ -26,7 +26,7 @@ def plots(x,y,xlabel,ylabel,title, style='dark_background',y_limit=False, line_p
     plt.show()
 
 
-def pie_plots(x,labels,title, style):
+def pie_plots(x,labels,title, style='dark_background'):
     plt.rcParams['figure.figsize'] = [10, 10]
     plt.style.use(style)
     plt.pie(x, labels=labels, autopct='%1.1f%%', labeldistance=1.1, textprops={'fontsize': 14})
@@ -34,7 +34,7 @@ def pie_plots(x,labels,title, style):
     plt.show()
 
 
-def scatter_plot_colorbar(x,y,hue,xlabel,ylabel,color_label,title, style):
+def scatter_plot_colorbar(x,y,hue,xlabel,ylabel,color_label,title, style='dark_background'):
 
     # Create a dictionary that maps each unique content to a unique color
     unique_content = list(set(hue))
