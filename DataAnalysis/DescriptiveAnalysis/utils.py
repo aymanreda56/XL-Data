@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def plots(x,y,xlabel,ylabel,title, style='dark_background',y_limit=False, line_plot=False, stacked=False, y2=None, label2=None):
     plt.figure(figsize=(20, 10))
