@@ -152,12 +152,7 @@ def detect_outliers(df, remove=False):
     Detect #outliers in all numerical columns
     '''
 
-    #   outliers = outliers.withColumn("row_id", row_number().over(Window.orderBy(monotonically_increasing_id())))
-
-    #   outliers_index[col] = [row["row_id"] for row in outliers.select("row_id").collect()]
-
     df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
-    outliers_index = dict()
 
     # get the total number of rows in the DataFrame
     total_rows = df_num.count()
@@ -178,7 +173,6 @@ def detect_outliers(df, remove=False):
 
         # calculate the percentage of outliers
         percent_outliers = (num_outliers / total_rows) * 100
-        # outliers_index[col] = (num_outliers, percent_outliers)
 
         print(f'Number of outliers in {col}: {num_outliers} ({percent_outliers:.2f}%)')
 
