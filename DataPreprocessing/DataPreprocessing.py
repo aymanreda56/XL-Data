@@ -98,56 +98,6 @@ def remove_useless_col(df, cols=[]):
     return df
 
 
-def show_nulls(df):
-    '''
-    Show the number of null values in each column
-    '''
-
-    df_miss = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns]).toPandas()
-    df_miss = df_miss.transpose()
-    df_miss.columns = ['count']
-    df_miss = df_miss.sort_values(by='count', ascending=False)
-
-    # get the percentage of null values in each column
-    df_miss['percentage'] = df_miss['count']/df.count()*100
-
-    print(df_miss)
-
-
-def handle_missing_values(df, treatment='drop', cols=[]):
-    '''
-    Handling the missing values in the dataset
-    '''
-    
-    print(f'Total Number of rows : {df.count()}')
-    
-    # get #rows with missing values in sny of its columns 
-    #TODO: fix this
-    # print(f'Number of rows with missing values: {df_miss.count()}')
-    
-    if treatment=='drop':
-        df = df.na.drop()
-        print(f'Number of rows after dropping: {df.count()}') 
-        return df
-
-    imputer = Imputer(inputCols=cols, outputCols=["{}_imputed".format(c) for c in cols])
-
-    if treatment=='mean':
-        imputer.setStrategy("mean")
-
-    elif treatment=='median':
-        imputer.setStrategy("median")
-
-    elif treatment=='mode':
-        imputer.setStrategy("mode")        
-
-    # elif treatment== 'interpolate':
-    #     imputer.setStrategy("interpolate")
-
-    df = imputer.fit(df).transform(df)
-    return df
-
-
 def detect_outliers(df):
     '''
     Detect outliers in all numerical columns
@@ -200,6 +150,7 @@ def detect_outliers(df):
 
     return new_df_with_no_outliers
 
+
 def boxplot_for_outliers(df, new_df_with_no_outliers):
     # Select only the numerical columns
     df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
@@ -225,6 +176,65 @@ def boxplot_for_outliers(df, new_df_with_no_outliers):
 
     plt.tight_layout()
     plt.show()
+    
+
+def remove_outliers(df,new_df):
+    '''
+    Remove the outliers from the dataset
+   '''
+    
+    # replace the common columns in the original DataFrame with the new DataFrame
+    for col in new_df.columns:
+        if col in df.columns:
+            df = df.withColumn(col, new_df[col])
+
+    return df
+
+def show_nulls(df):
+    '''
+    Show the number of null values in each column
+    '''
+
+    df_miss = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns]).toPandas()
+    df_miss = df_miss.transpose()
+    df_miss.columns = ['count']
+    df_miss = df_miss.sort_values(by='count', ascending=False)
+
+    # get the percentage of null values in each column
+    df_miss['percentage'] = df_miss['count']/df.count()*100
+
+    print(df_miss)
+
+
+def handle_missing_values(df, treatment='drop', cols=[]):
+    '''
+    Handling the missing values in the dataset
+    '''
+    
+    print(f'Total Number of rows : {df.count()}')
+    
+    if treatment=='drop':
+        df = df.na.drop()
+        print(f'Number of rows after dropping: {df.count()}') 
+        return df
+
+    imputer = Imputer(inputCols=cols, outputCols=["{}_imputed".format(c) for c in cols])
+
+    if treatment=='mean':
+        imputer.setStrategy("mean")
+
+    elif treatment=='median':
+        imputer.setStrategy("median")
+
+    elif treatment=='mode':
+        imputer.setStrategy("mode")        
+
+    # elif treatment== 'interpolate':
+    #     imputer.setStrategy("interpolate")
+
+    df = imputer.fit(df).transform(df)
+    return df
+
 
 
 def handle_size_col(df):
