@@ -6,6 +6,8 @@ import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
 from pyspark.sql.functions import regexp_replace, isnan, when, count, col,row_number, monotonically_increasing_id
 from pyspark.sql.window import Window
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def split_data():
     '''
@@ -146,7 +148,6 @@ def handle_missing_values(df, treatment='drop', cols=[]):
     return df
 
 
-
 def detect_outliers(df):
     '''
     Detect outliers in all numerical columns
@@ -199,13 +200,32 @@ def detect_outliers(df):
 
     return new_df_with_no_outliers
 
+def boxplot_for_outliers(df, new_df_with_no_outliers):
+    # Select only the numerical columns
+    df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
+    new_df_num = new_df_with_no_outliers.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
 
+    # Create a list of the numerical columns
+    num_cols = df_num.columns
 
-def remove_outliers(df_with_no_outliers):
-    '''
-    Remove the outliers from rows
-    '''
-    return df_with_no_outliers
+   # create a grid of subplots 
+    fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(20, 10))
+    plt.style.use("dark_background")
+
+    # plot each column in a boxplot for both the original and the new DataFrame
+    for i, col_name in enumerate(num_cols):
+        # make the boxplot vertically stacked
+
+        sns.boxplot(y=col_name, data=df_num.toPandas(),  ax=axes[0,i])
+        sns.boxplot(y=col_name,data=new_df_num.toPandas(), ax=axes[1,i])
+
+        # give each subplot a title
+        axes[0,i].set_title(f'Original {col}')
+        axes[1,i].set_title(f'New {col}')
+
+    plt.tight_layout()
+    plt.show()
+
 
 
 def handle_size_col(df):
