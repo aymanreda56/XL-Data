@@ -4,7 +4,8 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
-from pyspark.sql.functions import regexp_replace 
+from pyspark.sql.functions import regexp_replace, isnan, when, count, col,row_number, monotonically_increasing_id
+from pyspark.sql.window import Window
 
 def split_data():
     '''
@@ -20,16 +21,17 @@ def split_data():
     test.to_csv('../Dataset/test.csv', index=False)
 
 
-def read_data(spark, file_name='all', features='all', encode=False):
+def read_data(spark, file_name='all', features='all', encode=False, useless_cols=[]):
     
     '''
     Read the dataset and return a dataframe 
-
+    TODO: return x_data and y_data instead of the whole dataframe for the model to be trained
 
     file_name: 'train', 'val', 'test', 'all' ----> all is the default
     features: 'all', 'Categorical', 'Numerical' ----> all is the default
     encode: True, False (encode categorical features)     
-    TODO: return x_data and y_data instead of the whole dataframe
+    useless_cols: list of columns to be removed from the dataset (default: empty list)
+
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
 
@@ -38,27 +40,26 @@ def read_data(spark, file_name='all', features='all', encode=False):
     elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
     else:                        path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
 
-
+    # colab_path = '/content/drive/MyDrive/Google-Playstore.csv'
     df = spark.read.csv(path, header=True, inferSchema= True)
     
     numerical_cols= ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs","Price"]
+
+    # cast the numerical columns to their correct type
+    df= df.withColumn("Rating", df["Rating"].cast("float"))
+    df= df.withColumn("Rating Count", df["Rating Count"].cast("int"))
+    df= df.withColumn("Minimum Installs", df["Minimum Installs"].cast("int"))
+    df= df.withColumn("Maximum Installs", df["Maximum Installs"].cast("int"))
+    df= df.withColumn("Price", df["Price"].cast("float"))
 
     # extract the categorical fetaures only 
     if features=='Categorical':
         df= df.select([column for column in df.columns if column not in numerical_cols])
         
-    
     # extract the numerical fetaures only
     elif features=='Numerical':
-        df= df.select(numerical_cols)
-        
-        df= df.withColumn("Rating", df["Rating"].cast("float"))
-        df= df.withColumn("Rating Count", df["Rating Count"].cast("int"))
-        df= df.withColumn("Minimum Installs", df["Minimum Installs"].cast("int"))
-        df= df.withColumn("Maximum Installs", df["Maximum Installs"].cast("int"))
-        df= df.withColumn("Price", df["Price"].cast("float"))
+      df= df.select(numerical_cols)  
 
-   
     # encode the categorical features 
     if encode :
         cols_to_drop=[]
@@ -70,7 +71,21 @@ def read_data(spark, file_name='all', features='all', encode=False):
 
         df = df.drop(*cols_to_drop)
 
+    # remove the useless columns
+    if len(useless_cols) > 0:
+        df = remove_useless_col(df, useless_cols)
+
     return df
+
+
+def get_info(df):
+    '''
+    Get the info of the dataset
+    '''
+    print(f'Number of rows: {df.count()}, Number of columns: {len(df.columns)}')
+    # print(f'Available features: {df.columns}')
+    
+    df.describe().show()
 
 
 def remove_useless_col(df, cols=[]):
@@ -81,16 +96,31 @@ def remove_useless_col(df, cols=[]):
     return df
 
 
-def missing_values(df, treatment='drop', cols=[]):
+def show_nulls(df):
     '''
-    Dealing with the missing values in the dataset
+    Show the number of null values in each column
+    '''
+
+    df_miss = df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df.columns]).toPandas()
+    df_miss = df_miss.transpose()
+    df_miss.columns = ['count']
+    df_miss = df_miss.sort_values(by='count', ascending=False)
+
+    # get the percentage of null values in each column
+    df_miss['percentage'] = df_miss['count']/df.count()*100
+
+    print(df_miss)
+
+
+def handle_missing_values(df, treatment='drop', cols=[]):
+    '''
+    Handling the missing values in the dataset
     '''
     
     print(f'Total Number of rows : {df.count()}')
     
     # get #rows with missing values in sny of its columns 
     #TODO: fix this
-    # df_miss = df.filter(isnull(df).any())
     # print(f'Number of rows with missing values: {df_miss.count()}')
     
     if treatment=='drop':
@@ -116,44 +146,50 @@ def missing_values(df, treatment='drop', cols=[]):
     return df
 
 
-def get_info(df):
-    '''
-    Get the info of the dataset
-    '''
-    print(f'Number of rows: {df.count()}, Number of columns: {len(df.columns)}')
-    print(f'Available features: {df.columns}')
 
-    df.describe().show()
-
-
-def detect_outliers(df, col):
+def detect_outliers(df, remove=False):
     '''
-    Detect #outliers in a certain column
+    Detect #outliers in all numerical columns
     '''
 
-    # calculate interquartile range (IQR)
-    q1 = df.approxQuantile(col, [0.25], 0.0)[0]
-    q3 = df.approxQuantile(col, [0.75], 0.0)[0]
+    #   outliers = outliers.withColumn("row_id", row_number().over(Window.orderBy(monotonically_increasing_id())))
 
-    iqr= q3 - q1
+    #   outliers_index[col] = [row["row_id"] for row in outliers.select("row_id").collect()]
 
-    # calculate the lower and upper bound
-    lower_bound = q1 - (1.5 * iqr)
-    upper_bound = q3 + (1.5 * iqr)
+    df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
+    outliers_index = dict()
 
-    # get the number of outliers 
-    outliers = df.filter((df[col] < lower_bound) | (df[col] > upper_bound))
+    # get the total number of rows in the DataFrame
+    total_rows = df_num.count()
+
+    for col in df_num.columns:
+        # calculate interquartile range (IQR)
+        q1 = df_num.approxQuantile(col, [0.25], 0.0)[0]
+        q3 = df_num.approxQuantile(col, [0.75], 0.0)[0]
+        iqr = q3 - q1
+
+        # calculate the lower and upper bound
+        lower_bound = q1 - (1.5 * iqr)
+        upper_bound = q3 + (1.5 * iqr)
+
+        # get the number of outliers
+        outliers = df_num.filter((df_num[col] < lower_bound) | (df_num[col] > upper_bound))
+        num_outliers = outliers.count()
+
+        # calculate the percentage of outliers
+        percent_outliers = (num_outliers / total_rows) * 100
+        # outliers_index[col] = (num_outliers, percent_outliers)
+
+        print(f'Number of outliers in {col}: {num_outliers} ({percent_outliers:.2f}%)')
+
+    # return outliers_index
     
-    outliers_index = outliers.index
-    num_outliers = outliers.count()
 
-    print(f'Number of outliers in {col}: {num_outliers}')
-    return outliers_index
-    
-
-def remove_outliers(df, col):
-    outliers_index= detect_outliers(df, col)
-    df = df.drop(outliers_index)
+def remove_outliers(df,outliers_index, col):
+    '''
+    Remove the outliers from a certain column
+    '''
+    df = df.drop(outliers_index[col])
     return df
 
 
@@ -176,6 +212,9 @@ def handle_size_col(df):
     print("Converted all sizes to Bytes.")
 
 def currency_col(df):
+    '''
+    Explore the currency column
+    '''
     currency_col = df.select('Currency')
     currency_counts = currency_col.groupBy('Currency').count().sort('count', ascending=False)
     currency_counts.show()
@@ -205,13 +244,16 @@ def remove_commas(df):
 
         df[col]= df[col].astype(col_type)
 
-        if col=='Minimum Installs':
-            df[col]= df[col].astype('Int64')
+        # if col=='Minimum Installs':
+        #     df[col]= df[col].astype('Int64')
 
     return df
 
 
 def delimiter_to_comma(file_name='Google-Playstore'):
+    '''
+    Handle the delimiter in the dataset to be used in RDD
+    '''
     df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
     df_new= remove_commas(df)
     df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
