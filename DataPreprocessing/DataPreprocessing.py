@@ -220,12 +220,11 @@ def boxplot_for_outliers(df, new_df_with_no_outliers):
         sns.boxplot(y=col_name,data=new_df_num.toPandas(), ax=axes[1,i])
 
         # give each subplot a title
-        axes[0,i].set_title(f'Original {col}')
-        axes[1,i].set_title(f'New {col}')
+        axes[0,i].set_title(f'Original {col_name}')
+        axes[1,i].set_title(f'New {col_name}')
 
     plt.tight_layout()
     plt.show()
-
 
 
 def handle_size_col(df):
