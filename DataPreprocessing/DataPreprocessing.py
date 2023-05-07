@@ -4,8 +4,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
-from pyspark.sql.functions import regexp_replace, isnan, when, count, col,row_number, monotonically_increasing_id
-from pyspark.sql.window import Window
+from pyspark.sql.functions import regexp_replace, isnan, when, count, col
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -90,14 +89,6 @@ def get_info(df):
     df.describe().show()
 
 
-def remove_useless_col(df, cols=[]):
-    '''
-    Remove the useless columns from the dataset
-    '''
-    df = df.drop(*cols) 
-    return df
-
-
 def detect_outliers(df):
     '''
     Detect outliers in all numerical columns
@@ -140,21 +131,21 @@ def detect_outliers(df):
     new_df = df_num.withColumn("total_outliers", sum(df_num[col] for col in selected_columns))
 
     # Filter out rows with more than 1 total outlier
-    new_df_with_no_outliers = new_df.filter(new_df["total_outliers"] <= 1)
+    new_df = new_df.filter(new_df["total_outliers"] <= 1)
 
     print(f'Number of rows before removing outliers: {total_rows}')
-    print(f'Number of rows after removing outliers: {new_df_with_no_outliers.count()}')
+    print(f'Number of rows after removing outliers: {new_df.count()}')
 
     # Drop the extra columns created above
-    new_df_with_no_outliers = new_df_with_no_outliers.drop(*selected_columns).drop("total_outliers")
+    new_df = new_df.drop(*selected_columns).drop("total_outliers")
 
-    return new_df_with_no_outliers
+    return new_df
 
 
-def boxplot_for_outliers(df, new_df_with_no_outliers):
+def boxplot_for_outliers(df, new_df):
     # Select only the numerical columns
     df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
-    new_df_num = new_df_with_no_outliers.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
+    new_df_num = new_df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
 
     # Create a list of the numerical columns
     num_cols = df_num.columns
@@ -176,7 +167,7 @@ def boxplot_for_outliers(df, new_df_with_no_outliers):
 
     plt.tight_layout()
     plt.show()
-    
+
 
 def remove_outliers(df,new_df):
     '''
@@ -206,35 +197,56 @@ def show_nulls(df):
     print(df_miss)
 
 
-def handle_missing_values(df, treatment='drop', cols=[]):
+def handle_missing_values(df, handling_method='drop', cols=[]):
     '''
     Handling the missing values in the dataset
     '''
     
     print(f'Total Number of rows : {df.count()}')
     
-    if treatment=='drop':
-        df = df.na.drop()
+    if handling_method=='drop':
+        if len(cols)>0:
+            df = df.na.drop(subset=cols)
+        
         print(f'Number of rows after dropping: {df.count()}') 
         return df
 
     imputer = Imputer(inputCols=cols, outputCols=["{}_imputed".format(c) for c in cols])
 
-    if treatment=='mean':
+    if handling_method=='mean':
         imputer.setStrategy("mean")
 
-    elif treatment=='median':
+    elif handling_method=='median':
         imputer.setStrategy("median")
 
-    elif treatment=='mode':
+    elif handling_method=='mode':
         imputer.setStrategy("mode")        
 
-    # elif treatment== 'interpolate':
+    # elif handling_method== 'interpolate':
     #     imputer.setStrategy("interpolate")
 
     df = imputer.fit(df).transform(df)
     return df
 
+
+def remove_useless_col(df, cols=[]):
+    '''
+    Remove the useless columns from the dataset
+    '''
+    df = df.drop(*cols) 
+    return df
+
+
+def currency_col(df):
+    '''
+    Explore the currency column
+    '''
+    if 'Currency' not in df.columns:
+        return
+    
+    currency_col = df.select('Currency')
+    currency_counts = currency_col.groupBy('Currency').count().sort('count', ascending=False)
+    currency_counts.show()
 
 
 def handle_size_col(df):
@@ -255,13 +267,7 @@ def handle_size_col(df):
 
     print("Converted all sizes to Bytes.")
 
-def currency_col(df):
-    '''
-    Explore the currency column
-    '''
-    currency_col = df.select('Currency')
-    currency_counts = currency_col.groupBy('Currency').count().sort('count', ascending=False)
-    currency_counts.show()
+
 
 
 #--------------------------------------------------------------------------
