@@ -147,11 +147,13 @@ def handle_missing_values(df, treatment='drop', cols=[]):
 
 
 
-def detect_outliers(df, remove=False):
+def detect_outliers(df):
     '''
-    Detect #outliers in all numerical columns
+    Detect outliers in all numerical columns
+    Detect rows with outliers in any of its columns and if it has more than 1 outlier in any of its columns
+    then it will be considered as an outlier row and can be removed 
     '''
-
+    # Select only the numerical columns
     df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
 
     # get the total number of rows in the DataFrame
@@ -176,15 +178,34 @@ def detect_outliers(df, remove=False):
 
         print(f'Number of outliers in {col}: {num_outliers} ({percent_outliers:.2f}%)')
 
-    # return outliers_index
-    
+        # create a new column to flag the outliers
+        is_outlier_col = f"is_outlier_{col}"
+        df_num = df_num.withColumn(is_outlier_col, when((df_num[col] < lower_bound) | (df_num[col] > upper_bound), 1).otherwise(0))
 
-def remove_outliers(df,outliers_index, col):
+    # Select the outlier columns
+    selected_columns = [column for column in df_num.columns if column.startswith("is_outlier")]
+
+    # Add up the outlier columns to create a new column for total outliers
+    new_df = df_num.withColumn("total_outliers", sum(df_num[col] for col in selected_columns))
+
+    # Filter out rows with more than 1 total outlier
+    new_df_with_no_outliers = new_df.filter(new_df["total_outliers"] <= 1)
+
+    print(f'Number of rows before removing outliers: {total_rows}')
+    print(f'Number of rows after removing outliers: {new_df_with_no_outliers.count()}')
+
+    # Drop the extra columns created above
+    new_df_with_no_outliers = new_df_with_no_outliers.drop(*selected_columns).drop("total_outliers")
+
+    return new_df_with_no_outliers
+
+
+
+def remove_outliers(df_with_no_outliers):
     '''
-    Remove the outliers from a certain column
+    Remove the outliers from rows
     '''
-    df = df.drop(outliers_index[col])
-    return df
+    return df_with_no_outliers
 
 
 def handle_size_col(df):
