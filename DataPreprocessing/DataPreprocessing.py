@@ -207,13 +207,14 @@ def handle_missing_values(df, handling_method='drop', cols=[]):
         if len(cols)>0:
             df = df.na.drop(subset=cols)
         
-        print(f'Number of rows after dropping: {df.count()}') 
+        print(f'Number of rows after dropping the missing values: {df.count()}') 
         return df
     
     if handling_method=='mode':
         for col in cols:
             mode_value = df.select(mode(col)).collect()[0][0]
-            df = df.fillna(mode_value, subset=[col])
+            df = df.fillna(mode_value, subset=[col]) 
+        return df
 
     imputer = Imputer(inputCols=cols, outputCols=["{}_imputed".format(c) for c in cols])
 
@@ -225,10 +226,6 @@ def handle_missing_values(df, handling_method='drop', cols=[]):
 
     df = imputer.fit(df).transform(df)
 
-    # replace the value of the original columns with the imputed columns
-    for col_name in cols:
-        df = df.withColumn(col_name, when(col(col_name).isNull(), col(col_name + '_imputed')).otherwise(col(col_name)))
-    
     # drop the imputed columns
     df = df.drop(*[col_name + '_imputed' for col_name in cols])
     
