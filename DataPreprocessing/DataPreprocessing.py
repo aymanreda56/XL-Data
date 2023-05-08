@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
-from pyspark.sql.functions import regexp_replace, isnan, when, count, col,mode
+from pyspark.sql.functions import regexp_replace, isnan, when, count, col,mode, split
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -275,7 +275,7 @@ def check_values_in_size_col(df):
     '''
     df_size= df.filter(df.Size == 'Varies with device').count()
     print(f'Percentage of apps with size "Varies with device": {(df_size/df.count())*100} %')
-    
+
 
 def convert_size_to_bytes(df):
     '''
@@ -294,7 +294,24 @@ def convert_size_to_bytes(df):
     return df
 
 
-# ---------------------------------------  Scrapped time  ---------------------------------------
+# ---------------------------------------  Scraped time  ---------------------------------------
+
+def check_scraped_time(df):
+    '''
+    Check the unique dates in the scrapped time column, so that if most of them have been scrapped in the same day,
+    we can drop the scrapped time column
+    '''
+
+    scraped_time_col = df.select('Scraped Time')
+
+    # 2021-06-16 01:37:34 --> split by space --> 2021-06-16    
+    scraped_time_col = scraped_time_col.withColumn('Scraped Time', split(col('Scraped Time'), ' ').getItem(0))
+
+    # get the unique dates
+    scraped_time_col = scraped_time_col.groupBy('Scraped Time').count().sort('count', ascending=False)
+
+    scraped_time_col.show()
+
 
 #======================================== RDD ========================================
           
