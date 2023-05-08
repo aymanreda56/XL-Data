@@ -169,17 +169,15 @@ def boxplot_for_outliers(df, new_df):
     plt.show()
 
 
-def remove_outliers(df,new_df):
+def remove_outliers(original_df,df_with_no_outliers):
     '''
     Remove the outliers from the dataset
    '''
-    
-    # replace the common columns in the original DataFrame with the new DataFrame
-    for col in new_df.columns:
-        if col in df.columns:
-            df = df.withColumn(col, new_df[col])
+    common_cols = list(set(original_df.columns) & set(df_with_no_outliers.columns))
 
-    return df
+    new_df = df_with_no_outliers.join(original_df, on=common_cols, how='inner')    
+
+    return new_df
 
 def show_nulls(df):
     '''
@@ -222,10 +220,13 @@ def handle_missing_values(df, handling_method='drop', cols=[]):
     elif handling_method=='mode':
         imputer.setStrategy("mode")        
 
-    # elif handling_method== 'interpolate':
-    #     imputer.setStrategy("interpolate")
-
     df = imputer.fit(df).transform(df)
+
+    # replace the value of the original columns with the imputed columns
+    for col_name in cols:
+        df = df.withColumn(col_name, when(col(col_name).isNull(), col(col_name + '_imputed')).otherwise(col(col_name)))
+        df = df.drop(col_name + '_imputed')
+        
     return df
 
 
@@ -266,8 +267,6 @@ def handle_size_col(df):
     df = df.withColumn('Size', regexp_replace('Size', 'k', '000'))   
 
     print("Converted all sizes to Bytes.")
-
-
 
 
 #--------------------------------------------------------------------------
