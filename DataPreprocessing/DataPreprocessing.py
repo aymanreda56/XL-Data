@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
-from pyspark.sql.functions import regexp_replace, isnan, when, count, col
+from pyspark.sql.functions import regexp_replace, isnan, when, count, col,mode
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -179,6 +179,7 @@ def remove_outliers(original_df,df_with_no_outliers):
 
     return new_df
 
+
 def show_nulls(df):
     '''
     Show the number of null values in each column
@@ -199,34 +200,38 @@ def handle_missing_values(df, handling_method='drop', cols=[]):
     '''
     Handling the missing values in the dataset
     '''
-    
-    print(f'Total Number of rows : {df.count()}')
-    
+
+    print(f'Total Number of rows: {df.count()}')
+
     if handling_method=='drop':
         if len(cols)>0:
             df = df.na.drop(subset=cols)
         
         print(f'Number of rows after dropping: {df.count()}') 
         return df
+    
+    if handling_method=='mode':
+        for col in cols:
+            mode_value = df.select(mode(col)).collect()[0][0]
+            df = df.fillna(mode_value, subset=[col])
 
     imputer = Imputer(inputCols=cols, outputCols=["{}_imputed".format(c) for c in cols])
 
-    if handling_method=='mean':
-        imputer.setStrategy("mean")
-
-    elif handling_method=='median':
+    if handling_method=='median':
         imputer.setStrategy("median")
 
-    elif handling_method=='mode':
-        imputer.setStrategy("mode")        
+    elif handling_method=='mean':
+        imputer.setStrategy("mean")        
 
     df = imputer.fit(df).transform(df)
 
     # replace the value of the original columns with the imputed columns
     for col_name in cols:
         df = df.withColumn(col_name, when(col(col_name).isNull(), col(col_name + '_imputed')).otherwise(col(col_name)))
-        df = df.drop(col_name + '_imputed')
-        
+    
+    # drop the imputed columns
+    df = df.drop(*[col_name + '_imputed' for col_name in cols])
+    
     return df
 
 
@@ -306,3 +311,31 @@ def delimiter_to_comma(file_name='Google-Playstore'):
     df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
     df_new= remove_commas(df)
     df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
+
+
+#--------------------------------------------------------------------------
+
+def process_data(spark, file_name='all', features='all', encode=False, useless_cols=[]):
+    '''
+    To be used in the next modules
+    '''
+
+    df= read_data(spark, file_name=file_name, features=features, encode=encode, useless_cols=useless_cols)
+
+    new_df= detect_outliers(df)
+    df= remove_outliers(df,new_df) 
+
+    drop_cols= ['Developer Website','Privacy Policy','Currency'] 
+    df= remove_useless_col(df,drop_cols)
+
+    uninteresting_cols= ['Minimum Android','Size','Minimum Installs','Installs','Developer Email',\
+                   'Developer Id','Price','Ad Supported','In App Purchases']
+    df=handle_missing_values(df,cols=uninteresting_cols)
+
+    interesting_num_cols=['Rating','Rating Count','Maximum Installs']
+    df= handle_missing_values(df, handling_method='mean', cols=interesting_num_cols)
+
+    interesting_cat_cols=['Released']
+    df= handle_missing_values(df, handling_method='mode', cols=interesting_cat_cols) 
+
+    df= handle_size_col(df)
