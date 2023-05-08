@@ -8,6 +8,9 @@ from pyspark.sql.functions import regexp_replace, isnan, when, count, col,mode
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
+#  ======================================= Generic functions  =======================================
+
 def split_data():
     '''
     Split the dataset into train, validation and test set with ratio 60:20:20
@@ -88,6 +91,17 @@ def get_info(df):
     
     df.describe().show()
 
+
+def remove_useless_col(df, cols=[]):
+    '''
+    Remove the useless columns from the dataset
+    '''
+    df = df.drop(*cols) 
+    return df
+
+
+# ======================================= Data Cleaning =======================================
+# ---------------------------------------- Outliers ----------------------------------------
 
 def detect_outliers(df):
     '''
@@ -180,6 +194,8 @@ def remove_outliers(original_df,df_with_no_outliers):
     return new_df
 
 
+#---------------------------------------  Missing Values --------------------------------------- 
+
 def show_nulls(df):
     '''
     Show the number of null values in each column
@@ -235,12 +251,8 @@ def handle_missing_values(df, handling_method='drop', cols=[]):
     return df
 
 
-def remove_useless_col(df, cols=[]):
-    '''
-    Remove the useless columns from the dataset
-    '''
-    df = df.drop(*cols) 
-    return df
+# ======================================= Explore some columns =======================================
+#---------------------------------------  Currency  ---------------------------------------
 
 
 def currency_col(df):
@@ -255,15 +267,21 @@ def currency_col(df):
     currency_counts.show()
 
 
-def handle_size_col(df):
+# ---------------------------------------  Size  ---------------------------------------
+
+def check_values_in_size_col(df):
+    '''
+    We have a value in the size column called 'Varies with device', we need to check how many apps have this value
+    '''
+    df_size= df.filter(df.Size == 'Varies with device').count()
+    print(f'Percentage of apps with size "Varies with device": {(df_size/df.count())*100} %')
+    
+
+def convert_size_to_bytes(df):
     '''
     Since size is in G/M/K, we can convert it to be totally numerical for ease of analysis
     '''
 
-    df_size= df.filter(df.Size == 'Varies with device').count()
-    print(f'Percentage of apps with size "Varies with device": {(df_size/df.count())*100} %')
-
-    # remove the 'Varies with device' value
     df = df.filter(df.Size != 'Varies with device')
 
     # remove the 'G', 'M' and 'k' from the values
@@ -273,8 +291,12 @@ def handle_size_col(df):
 
     print("Converted all sizes to Bytes.")
 
+    return df
 
-#--------------------------------------------------------------------------
+
+# ---------------------------------------  Scrapped time  ---------------------------------------
+
+#======================================== RDD ========================================
           
 def remove_commas(df):
     '''
@@ -298,9 +320,6 @@ def remove_commas(df):
 
         df[col]= df[col].astype(col_type)
 
-        # if col=='Minimum Installs':
-        #     df[col]= df[col].astype('Int64')
-
     return df
 
 
@@ -313,7 +332,7 @@ def delimiter_to_comma(file_name='Google-Playstore'):
     df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
 
 
-#--------------------------------------------------------------------------
+#======================================== Main Function ========================================
 
 def process_data(spark, file_name='all', features='all', encode=False, useless_cols=[]):
     '''
@@ -338,4 +357,4 @@ def process_data(spark, file_name='all', features='all', encode=False, useless_c
     interesting_cat_cols=['Released']
     df= handle_missing_values(df, handling_method='mode', cols=interesting_cat_cols) 
 
-    df= handle_size_col(df)
+    df= convert_size_to_bytes(df)
