@@ -1,6 +1,5 @@
 import os
 import sys; sys.path.append("../")
-from sklearn.model_selection import train_test_split
 import pandas as pd
 import pyspark
 from pyspark.ml.feature import Imputer, StringIndexer
@@ -11,18 +10,18 @@ import seaborn as sns
 
 #  ======================================= Generic functions  =======================================
 
-def split_data():
+def split_spark_df(df):
     '''
     Split the dataset into train, validation and test set with ratio 60:20:20
     '''
-    df = pd.read_csv('../Dataset/Google-Playstore.csv')
+    train_test,val=  df.randomSplit([0.8,0.2])
+    train,test= train_test.randomSplit([0.75,0.25])
 
-    train_test,val=  train_test_split(df, test_size=0.2)
-    train,test= train_test_split(train_test, test_size=0.25)
+    train.toPandas().to_csv('../Dataset/train.csv', index=False)
+    val.toPandas().to_csv('../Dataset/val.csv', index=False)
+    test.toPandas().to_csv('../Dataset/test.csv', index=False)
 
-    train.to_csv('../Dataset/train.csv', index=False)
-    val.to_csv('../Dataset/val.csv', index=False)
-    test.to_csv('../Dataset/test.csv', index=False)
+    return train,val,test
 
 
 def read_data(spark, file_name='all', features='all', encode=False, useless_cols=[]):
@@ -65,7 +64,7 @@ def read_data(spark, file_name='all', features='all', encode=False, useless_cols
       df= df.select(numerical_cols)  
 
     # encode the categorical features 
-    if encode :
+    if encode:
         df= encode_categ_features(df,numerical_cols)
         
     # remove the useless columns
@@ -107,7 +106,6 @@ def encode_categ_features(df, cols=[]):
             cols_to_drop.append(col_name)
 
     df = remove_useless_col(df,cols_to_drop)
-
     return df
 
 # ======================================= Data Cleaning =======================================
@@ -234,7 +232,7 @@ def handle_missing_values(df, handling_method='drop', cols=[]):
         if len(cols)>0:
             df = df.na.drop(subset=cols)
         
-        print(f'Number of rows after dropping: {df.count()}') 
+        print(f'Number of rows after dropping nulls: {df.count()}') 
         return df
     
     if handling_method=='mode':
@@ -373,11 +371,14 @@ def process_data(spark, file_name='all', features='all', encode=False, useless_c
 
     df= read_data(spark, file_name=file_name, features=features, encode=encode, useless_cols=useless_cols)
 
+    print('Detecting outliers...')
     df= detect_outliers(df)
 
-    drop_cols= ['Developer Website','Privacy Policy','Currency'] 
+    print("Removing useless columns...")
+    drop_cols= ['Developer Website','Privacy Policy','Currency','Scraped time'] 
     df= remove_useless_col(df,drop_cols)
 
+    print("Handling missing values...")
     uninteresting_cols= ['Minimum Android','Size','Minimum Installs','Installs','Developer Email',\
                    'Developer Id','Price','Ad Supported','In App Purchases']
     df=handle_missing_values(df,cols=uninteresting_cols)
@@ -388,10 +389,9 @@ def process_data(spark, file_name='all', features='all', encode=False, useless_c
     interesting_cat_cols=['Released']
     df= handle_missing_values(df, handling_method='mode', cols=interesting_cat_cols) 
 
+    print("Converting size to bytes...")
     df= convert_size_to_bytes(df)
-
-    df= remove_useless_col(df, ['Scraped time'])
-
+    
     if rdd:
         df= df.toPandas()
         delimiter_to_comma(file_name=file_name,raw=False)
