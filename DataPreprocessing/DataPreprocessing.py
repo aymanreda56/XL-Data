@@ -110,12 +110,13 @@ def detect_outliers(df):
     then it will be considered as an outlier row and can be removed 
     '''
     # Select only the numerical columns
-    df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
+    df_num = df
 
     # get the total number of rows in the DataFrame
     total_rows = df_num.count()
+    numerical_columns = ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"]
 
-    for col in df_num.columns:
+    for col in numerical_columns:
         # calculate interquartile range (IQR)
         q1 = df_num.approxQuantile(col, [0.25], 0.0)[0]
         q3 = df_num.approxQuantile(col, [0.75], 0.0)[0]
@@ -148,7 +149,7 @@ def detect_outliers(df):
     new_df = new_df.filter(new_df["total_outliers"] <= 1)
 
     print(f'Number of rows before removing outliers: {total_rows}')
-    print(f'Number of rows after removing outliers: {new_df.count()}')
+    print(f'Number of rows after removing those having more than 1 outlier in its columns: {new_df.count()}')
 
     # Drop the extra columns created above
     new_df = new_df.drop(*selected_columns).drop("total_outliers")
@@ -183,15 +184,15 @@ def boxplot_for_outliers(df, new_df):
     plt.show()
 
 
-def remove_outliers(original_df,df_with_no_outliers):
-    '''
-    Remove the outliers from the dataset
-   '''
-    common_cols = list(set(original_df.columns) & set(df_with_no_outliers.columns))
+# def remove_outliers(original_df,df_with_no_outliers):
+#     '''
+#     Remove the outliers from the dataset
+#    '''
+#     common_cols = list(set(original_df.columns) & set(df_with_no_outliers.columns))
 
-    new_df = df_with_no_outliers.join(original_df, on=common_cols, how='inner')    
+#     new_df = df_with_no_outliers.join(original_df, on=common_cols, how='inner')    
 
-    return new_df
+#     return new_df
 
 
 #---------------------------------------  Missing Values --------------------------------------- 
@@ -362,8 +363,7 @@ def process_data(spark, file_name='all', features='all', encode=False, useless_c
 
     df= read_data(spark, file_name=file_name, features=features, encode=encode, useless_cols=useless_cols)
 
-    new_df= detect_outliers(df)
-    df= remove_outliers(df,new_df) 
+    df= detect_outliers(df)
 
     drop_cols= ['Developer Website','Privacy Policy','Currency'] 
     df= remove_useless_col(df,drop_cols)
