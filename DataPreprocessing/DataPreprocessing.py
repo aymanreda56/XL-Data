@@ -340,18 +340,22 @@ def remove_commas(df):
     return df
 
 
-def delimiter_to_comma(file_name='Google-Playstore'):
+def delimiter_to_comma(file_name='Google-Playstore',raw=False):
     '''
     Handle the delimiter in the dataset to be used in RDD
+
+    raw: if True, use the raw data, else use the processed data
     '''
-    df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
+    if raw: 
+        df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
+
     df_new= remove_commas(df)
     df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
 
 
 #======================================== Main Function ========================================
 
-def process_data(spark, file_name='all', features='all', encode=False, useless_cols=[]):
+def process_data(spark, file_name='all', features='all', encode=False, useless_cols=[], rdd=False):
     '''
     To be used in the next modules
     '''
@@ -375,3 +379,11 @@ def process_data(spark, file_name='all', features='all', encode=False, useless_c
     df= handle_missing_values(df, handling_method='mode', cols=interesting_cat_cols) 
 
     df= convert_size_to_bytes(df)
+
+    df= remove_useless_col(df, ['Scraped time'])
+
+    if rdd:
+        df= df.toPandas()
+        delimiter_to_comma(file_name=file_name,raw=False)
+
+    return df
