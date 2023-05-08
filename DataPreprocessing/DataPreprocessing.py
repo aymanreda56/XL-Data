@@ -100,7 +100,7 @@ def encode_categ_features(df, cols=[]):
     cols_to_drop=[]
 
     for col_name in df.columns:
-        if col_name not in numerical_cols:
+        if col_name not in cols:
             indexer = StringIndexer(inputCol=col_name, outputCol=col_name+"_index")
             df = indexer.setHandleInvalid("keep").fit(df).transform(df) 
             cols_to_drop.append(col_name)
