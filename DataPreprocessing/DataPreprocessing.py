@@ -44,7 +44,7 @@ def read_data(spark, file_name='all', features='all', encode=False, useless_cols
     elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
     else:                        path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
 
-    # colab_path = '/content/drive/MyDrive/Google-Playstore.csv'
+
     df = spark.read.csv(path, header=True, inferSchema= True)
     
     numerical_cols= ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs","Price"]
@@ -190,7 +190,6 @@ def boxplot_for_outliers(df, new_df):
 
     # plot each column in a boxplot for both the original and the new DataFrame
     for i, col_name in enumerate(num_cols):
-        # make the boxplot vertically stacked
 
         sns.boxplot(y=col_name, data=df_num.toPandas(),  ax=axes[0,i])
         sns.boxplot(y=col_name,data=new_df_num.toPandas(), ax=axes[1,i])
