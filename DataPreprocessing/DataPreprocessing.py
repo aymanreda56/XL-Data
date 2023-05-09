@@ -2,7 +2,7 @@ import os
 import sys; sys.path.append("../")
 import pandas as pd
 import pyspark
-from pyspark.ml.feature import Imputer, StringIndexer
+from pyspark.ml.feature import Imputer, StringIndexer,IndexToString
 from pyspark.sql.functions import regexp_replace, isnan, when, count, col,mode, split
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -24,7 +24,8 @@ def split_spark_df(df):
     return train,val,test
 
 
-def read_data(spark, file_name='all', features='all', encode=False, useless_cols=[]):
+def read_data(spark, file_name='all', features='all', encode=False, useless_cols=[],\
+              cols_to_encode=[]):
     
     '''
     Read the dataset and return a dataframe 
@@ -55,6 +56,9 @@ def read_data(spark, file_name='all', features='all', encode=False, useless_cols
     df= df.withColumn("Maximum Installs", df["Maximum Installs"].cast("int"))
     df= df.withColumn("Price", df["Price"].cast("float"))
 
+    # cast boolean columns to string (for encoding purposes)
+    df= df.withColumn("Editors Choice", df["Editors Choice"].cast("string"))
+
     # extract the categorical fetaures only 
     if features=='Categorical':
         df= df.select([column for column in df.columns if column not in numerical_cols])
@@ -65,7 +69,7 @@ def read_data(spark, file_name='all', features='all', encode=False, useless_cols
 
     # encode the categorical features 
     if encode:
-        df= encode_categ_features(df,numerical_cols)
+        df= encode_categ_features(df,cols_to_encode)
         
     # remove the useless columns
     if len(useless_cols) > 0:
@@ -89,25 +93,32 @@ def remove_useless_col(df, cols=[]):
     df = df.drop(*cols) 
     return df
 
-def encode_categ_features(df, cols=[]):
+def encode_categ_features(df, cols_to_encode=[]):
     '''
     Encode the categorical features to numerical features
     '''
-    if len(cols)==0:
-        numerical_cols= ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs","Price"]
-        cols= [column for column in df.columns if column not in numerical_cols]
+        
+    for column in cols_to_encode: 
+        encoder= StringIndexer(inputCol=column, outputCol=column+"_index", handleInvalid='skip').fit(df)
+        df= encoder.transform(df)
+        df= remove_useless_col(df,[column])
+        df= df.withColumnRenamed(column+"_index", column)
 
-    cols_to_drop=[]
-
-    for col_name in df.columns:
-        if col_name not in cols:
-            indexer = StringIndexer(inputCol=col_name, outputCol=col_name+"_index")
-            df = indexer.setHandleInvalid("keep").fit(df).transform(df) 
-            cols_to_drop.append(col_name)
-
-    df = remove_useless_col(df,cols_to_drop)
     return df
 
+def decode_num_features(df,cols_to_decode=[]):
+    '''
+    Decode the encoded numerical features back to categorical features
+    '''
+
+    for column in cols_to_decode:
+        decoder= IndexToString(inputCol=column, outputCol=column+"_index")
+        df = decoder.transform(df)
+        df=remove_useless_col(df,[column])
+        df= df.withColumnRenamed(column+"_index", column)
+
+    return df
+  
 # ======================================= Data Cleaning =======================================
 # ---------------------------------------- Outliers ----------------------------------------
 
