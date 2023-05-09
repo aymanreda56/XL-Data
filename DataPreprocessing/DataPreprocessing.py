@@ -24,14 +24,13 @@ def split_spark_df(df):
     return train,val,test
 
 
-def read_data(spark, file_name='all', features='all', encode=False, useless_cols=[],\
+def read_data(spark, features='all',  useless_cols=[],\
               cols_to_encode=[]):
     
     '''
     Read the dataset and return a dataframe 
-    TODO: return x_data and y_data instead of the whole dataframe for the model to be trained
 
-    file_name: 'train', 'val', 'test', 'all' ----> all is the default
+    file_name: 'train', 'val', 'test', 'all' ----> all is the default 
     features: 'all', 'Categorical', 'Numerical' ----> all is the default
     encode: True, False (encode categorical features)     
     useless_cols: list of columns to be removed from the dataset (default: empty list)
@@ -39,11 +38,12 @@ def read_data(spark, file_name='all', features='all', encode=False, useless_cols
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
 
-    if file_name == 'train':     path= os.path.join(dir, '../Dataset/train.csv')
-    elif file_name == 'val':     path= os.path.join(dir, '../Dataset/val.csv')
-    elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
-    else:                        path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
-
+    # if file_name == 'train':     path= os.path.join(dir, '../Dataset/train.csv')
+    # elif file_name == 'val':     path= os.path.join(dir, '../Dataset/val.csv')
+    # elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
+    # else:                        path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
+    
+    path= os.path.join(dir, '../Dataset/Preprocessed_data.csv')
 
     df = spark.read.csv(path, header=True, inferSchema= True)
     
@@ -68,7 +68,7 @@ def read_data(spark, file_name='all', features='all', encode=False, useless_cols
       df= df.select(numerical_cols)  
 
     # encode the categorical features 
-    if encode:
+    if len(cols_to_encode)>0:
         df= encode_categ_features(df,cols_to_encode)
         
     # remove the useless columns
