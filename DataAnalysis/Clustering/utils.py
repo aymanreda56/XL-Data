@@ -29,7 +29,7 @@ def elbow_method(data, max_clusters=10):
     plt.title("Elbow curve")
     plt.show()
     # return the optimal number of clusters
-    return sse.index(min(sse)) + 1
+    return clusters.index(min(sse)) + 1
 
 
 def silhouette_method(data, max_clusters=10):
@@ -56,4 +56,19 @@ def silhouette_method(data, max_clusters=10):
     plt.title("Silhouette curve")
     plt.show()
     # return the optimal number of clusters
-    return silhouette_scores.index(max(silhouette_scores)) + 2
+    return clusters.index(max(silhouette_scores)) + 2
+
+def convert_to_numeric(df):
+    ''' function to clean numeric columns from any strings and convert them to numeric'''
+    # drop nulls
+    df.dropna(inplace=True)
+    # remove comma from all the columns
+    df['Installs'] = df['Installs'].str.replace(',', '').str.replace('+', '').astype(float) 
+    df['Maximum Installs'] = df['Maximum Installs'].str.replace(',', '').astype(float)
+    df['Minimum Installs'] = df['Minimum Installs'].str.replace(',', '').astype(float)
+    df['Rating'] = df['Rating'].astype(float)
+    df['Size'] = df['Size'].str.replace(',', '').astype(float) /1000000
+    df['Minimum Android'] = df['Minimum Android'].str.replace(',', '').str.replace('Varies with device', '0.0')
+    # remove  "and up" from  Minimum Android column
+    df['Minimum Android'] = df['Minimum Android'].str.replace(' and up', '')
+    return df
