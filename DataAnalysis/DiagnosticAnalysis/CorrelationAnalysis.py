@@ -63,12 +63,13 @@ def categorical_corr(df):
             # matrix is symmetric, so don't need to calculate the lower triangle, place it with the value of the upper triangle
             if j < i:
                 corr[i,j] = corr[j,i]
+            elif i == j:
+                corr[i,j] = 1
             else:
                 corr[i,j] = cramers_v(df_disc, categorical_features[i], categorical_features[j])
 
     # Now plot the correlation matrix
     plt.figure(figsize=(20,20))
-    plt.style.use('dark_background')
     sns.set(font_scale=1.4)
     sns.heatmap(corr,
                 xticklabels=categorical_features,
