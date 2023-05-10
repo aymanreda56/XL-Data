@@ -69,7 +69,7 @@ def categorical_corr(df):
                 corr[i,j] = cramers_v(df_disc, categorical_features[i], categorical_features[j])
 
     # Now plot the correlation matrix
-    plt.figure(figsize=(20,20))
+    plt.figure(figsize=(20,10))
     sns.set(font_scale=1.4)
     sns.heatmap(corr,
                 xticklabels=categorical_features,
