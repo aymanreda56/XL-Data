@@ -24,19 +24,19 @@ def split_spark_df(df):
     return train,val,test
 
 
-def read_data(spark, features='all', useless_cols=[], cols_to_encode=[]):
+def read_data(spark, file_name=None, features='all', useless_cols=[], cols_to_encode=[]):
     
     '''
     Read the dataset and return a dataframe 
 
-    file_name: 'train', 'val', 'test', 'all' ----> all is the default 
-    features: 'all', 'Categorical', 'Numerical' ----> all is the default
-    encode: True, False (encode categorical features)     
+    features: 'all', 'Categorical', 'Numerical' ----> all is the default     
     useless_cols: list of columns to be removed from the dataset (default: empty list)
+    cols_to_encode: list of Categorical columns to be encoded (default: empty list)
 
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
-    path= os.path.join(dir, '../Dataset/Preprocessed_data.csv')
+    if file_name!=None: path= os.path.join(dir, '../Dataset/'+file_name+'.csv')
+    else:               path= os.path.join(dir, '../Dataset/Preprocessed_data.csv')
 
     df = spark.read.csv(path, header=True, inferSchema= True)
     
@@ -133,7 +133,7 @@ def detect_outliers(df):
 
     # get the total number of rows in the DataFrame
     total_rows = df_num.count()
-    numerical_columns = ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"]
+    numerical_columns = [column for column, dtype in df.dtypes if dtype != 'string']
 
     for col in numerical_columns:
         # calculate interquartile range (IQR)
@@ -178,27 +178,28 @@ def detect_outliers(df):
 
 def boxplot_for_outliers(df, new_df):
     # Select only the numerical columns
-    df_num = df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
-    new_df_num = new_df.select(["Rating", "Rating Count", "Minimum Installs", "Maximum Installs", "Price"])
+    df_num = df.select([column for column, dtype in df.dtypes if dtype != 'string'])
+    new_df_num = new_df.select([column for column, dtype in new_df.dtypes if dtype != 'string'])
 
     # Create a list of the numerical columns
     num_cols = df_num.columns
 
-   # create a grid of subplots 
-    fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(20, 10))
-    plt.style.use("dark_background")
+    # Create a figure with number of rows equal to number of columns in the dataframe and 2 columns 
+    fig, ax = plt.subplots(nrows=len(num_cols), ncols=2, figsize=(15, 50))
 
-    # plot each column in a boxplot for both the original and the new DataFrame
-    for i, col_name in enumerate(num_cols):
+    # Loop over the columns and create a boxplot for each one, where the first column is the original dataframe and the second column is the dataframe without outliers
+    for i, column in enumerate(num_cols):
+       # Convert the PySpark column to a Pandas Series
+        df_series = df_num.select(column).toPandas()[column]
+        new_df_series = new_df_num.select(column).toPandas()[column]
 
-        sns.boxplot(y=col_name, data=df_num.toPandas(),  ax=axes[0,i])
-        sns.boxplot(y=col_name,data=new_df_num.toPandas(), ax=axes[1,i])
+        # Plot the boxplot using the Pandas Series
+        sns.boxplot(data=df_series, ax=ax[i, 0])
+        sns.boxplot(data=new_df_series, ax=ax[i, 1])
+        
+        ax[i, 0].set_title(f'Original {column}')
+        ax[i, 1].set_title(f'Without outliers {column}')
 
-        # give each subplot a title
-        axes[0,i].set_title(f'Original {col_name}')
-        axes[1,i].set_title(f'New {col_name}')
-
-    plt.tight_layout()
     plt.show()
 
 
@@ -373,19 +374,22 @@ def delimiter_to_comma(file_name='Google-Playstore',raw=False):
 
 #======================================== Main Function ========================================
 
-def process_data(spark, file_name='all', features='all', encode=False, useless_cols=[], rdd=False):
+def process_data(spark, file_name='all', features='all', cols_to_encode=[], useless_cols=[], rdd=False):
     '''
     To be used in the next modules
     '''
 
-    df= read_data(spark, file_name=file_name, features=features, encode=encode, useless_cols=useless_cols)
-
-    print('Detecting outliers...')
-    df= detect_outliers(df)
+    df= read_data(spark, file_name=file_name, features=features,cols_to_encode=cols_to_encode, useless_cols=useless_cols)
 
     print("Removing useless columns...")
     drop_cols= ['Developer Website','Privacy Policy','Currency','Scraped time'] 
     df= remove_useless_col(df,drop_cols)
+
+    print("Converting size to bytes...")
+    df= convert_size_to_bytes(df)
+
+    print('Detecting outliers...')
+    df= detect_outliers(df)
 
     print("Handling missing values...")
     uninteresting_cols= ['Minimum Android','Size','Minimum Installs','Installs','Developer Email',\
@@ -397,9 +401,6 @@ def process_data(spark, file_name='all', features='all', encode=False, useless_c
 
     interesting_cat_cols=['Released']
     df= handle_missing_values(df, handling_method='mode', cols=interesting_cat_cols) 
-
-    print("Converting size to bytes...")
-    df= convert_size_to_bytes(df)
     
     if rdd:
         df= df.toPandas()
