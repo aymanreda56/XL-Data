@@ -4,6 +4,7 @@ import seaborn as sns
 import sklearn
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+import numpy as np
 
 def elbow_method(data, max_clusters=10):
     '''
@@ -72,3 +73,26 @@ def convert_to_numeric(df):
     # remove  "and up" from  Minimum Android column
     df['Minimum Android'] = df['Minimum Android'].str.replace(' and up', '')
     return df
+
+def kmeans_plus_plus(X, K):
+    '''
+    function return initial centroids for data to be used in 
+    k-mean clustering using k-mean++ approach 
+    '''
+    # Initialize first centroid randomly
+    means = [X[np.random.choice(len(X))]]
+    
+    for k in range(1, K):
+        # Calculate distance between each data point and the nearest centroid
+        distances = np.array([min([np.linalg.norm(x-c)**2 for c in means]) for x in X])
+        
+        # Calculate probability of each data point being chosen
+        probs = distances / distances.sum()
+        
+        # Randomly select a data point as the next centroid
+        next_mean = X[np.random.choice(len(X), p=probs)]
+        
+        # Add the next centroid to the list of centroids
+        means.append(next_mean)
+    
+    return means
