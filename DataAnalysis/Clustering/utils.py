@@ -74,11 +74,19 @@ def convert_to_numeric(df):
     df['Minimum Android'] = df['Minimum Android'].str.replace(' and up', '')
     return df
 
-def kmeans_plus_plus(X, K):
+def euclidean_distance(x1, x2):
+    '''
+    function to calculate the euclidean distance between two points
+    '''
+    return np.sqrt(np.sum((x1 - x2)**2))
+
+def kmeans_plus_plus(df, K):
     '''
     function return initial centroids for data to be used in 
     k-mean clustering using k-mean++ approach 
     '''
+    #convert dataframe to numpy array X
+    X = df.to_numpy()
     # Initialize first centroid randomly
     means = [X[np.random.choice(len(X))]]
     
@@ -94,5 +102,7 @@ def kmeans_plus_plus(X, K):
         
         # Add the next centroid to the list of centroids
         means.append(next_mean)
-    
+
+    print("Initial centroids: ", means)
     return means
+
