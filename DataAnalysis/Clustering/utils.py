@@ -122,6 +122,8 @@ def k_mean(df , k=3, initial_centroids=None):
     # Plot the data points and cluster centroids
     plt.scatter(X[:, 0], X[:, 1], c=kmeans.labels_, cmap='viridis')
     plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], marker='x', color='red')
+    plt.xlabel(df.columns[0])
+    plt.ylabel(df.columns[1])
     plt.show()
 
     # Get the clusters as lists
@@ -130,5 +132,5 @@ def k_mean(df , k=3, initial_centroids=None):
     cluster_2 = X[kmeans.labels_ == 2].tolist()
 
     #return the clusters
-    return cluster_0, cluster_1, cluster_2
+    return cluster_0, cluster_1, cluster_2,kmeans 
 
