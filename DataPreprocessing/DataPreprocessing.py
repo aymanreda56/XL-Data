@@ -24,8 +24,7 @@ def split_spark_df(df):
     return train,val,test
 
 
-def read_data(spark, features='all',  useless_cols=[],\
-              cols_to_encode=[]):
+def read_data(spark, features='all', useless_cols=[], cols_to_encode=[]):
     
     '''
     Read the dataset and return a dataframe 
@@ -37,18 +36,10 @@ def read_data(spark, features='all',  useless_cols=[],\
 
     '''
     dir= os.path.dirname(os.path.realpath(__file__))
-
-    # if file_name == 'train':     path= os.path.join(dir, '../Dataset/train.csv')
-    # elif file_name == 'val':     path= os.path.join(dir, '../Dataset/val.csv')
-    # elif file_name == 'test':    path= os.path.join(dir, '../Dataset/test.csv')
-    # else:                        path= os.path.join(dir, '../Dataset/Google-Playstore.csv')
-    
     path= os.path.join(dir, '../Dataset/Preprocessed_data.csv')
 
     df = spark.read.csv(path, header=True, inferSchema= True)
     
-    numerical_cols= ["Rating", "Rating Count", "Minimum Installs", "Maximum Installs","Price"]
-
     # cast the numerical columns to their correct type
     df= df.withColumn("Rating", df["Rating"].cast("float"))
     df= df.withColumn("Rating Count", df["Rating Count"].cast("int"))
@@ -56,8 +47,17 @@ def read_data(spark, features='all',  useless_cols=[],\
     df= df.withColumn("Maximum Installs", df["Maximum Installs"].cast("int"))
     df= df.withColumn("Price", df["Price"].cast("float"))
 
+    # remove the comma and the plus sign from the Installs column and cast it to int
+    df = df.withColumn("Installs", when(col("Installs").contains(","), regexp_replace("Installs", ",", ""))\
+        .otherwise(col("Installs")))\
+        .withColumn("Installs", regexp_replace("Installs", "\\+", ""))\
+        .withColumn("Installs", col("Installs").cast("int"))
+
     # cast boolean columns to string (for encoding purposes)
     df= df.withColumn("Editors Choice", df["Editors Choice"].cast("string"))
+
+    # Numerical columns
+    numerical_cols = [column for column, dtype in df.dtypes if dtype != 'string']
 
     # extract the categorical fetaures only 
     if features=='Categorical':
@@ -306,9 +306,10 @@ def convert_size_to_bytes(df):
     # remove the 'G', 'M' and 'k' from the values
     df = df.withColumn('Size', regexp_replace('Size', 'G', '000000000'))
     df = df.withColumn('Size', regexp_replace('Size', 'M', '000000'))
-    df = df.withColumn('Size', regexp_replace('Size', 'k', '000'))   
+    df = df.withColumn('Size', regexp_replace('Size', 'k', '000'))  
 
-    print("Converted all sizes to Bytes.")
+    # convert the column to float
+    df = df.withColumn('Size', df['Size'].cast("float")) 
 
     return df
 
@@ -342,8 +343,6 @@ def remove_commas(df):
     '''
     for col in df.columns:  
         col_type= df[col].dtypes
-        if col_type=='bool':
-            continue
 
         if col_type!='object':
             df[col] = df[col].astype(str)
