@@ -85,7 +85,7 @@ def kmeans_plus_plus(df, K):
     function return initial centroids for data to be used in 
     k-mean clustering using k-mean++ approach 
     '''
-    #convert dataframe to numpy array X
+    #convert data frame to numpy array X
     X = df.to_numpy()
     # Initialize first centroid randomly
     means = [X[np.random.choice(len(X))]]
@@ -105,4 +105,30 @@ def kmeans_plus_plus(df, K):
 
     print("Initial centroids: ", means)
     return means
+
+def k_mean(df , k=3, initial_centroids=None):
+
+    '''
+    function to perform k-mean clustering on the data, plot the clusters and return them
+    '''
+     
+    #convert data frame to numpy array X
+    X = df.to_numpy()
+
+    # Perform k-means clustering with k clusters
+    kmeans = KMeans(n_clusters=k, init=initial_centroids)
+    kmeans.fit(X)
+
+    # Plot the data points and cluster centroids
+    plt.scatter(X[:, 0], X[:, 1], c=kmeans.labels_, cmap='viridis')
+    plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], marker='x', color='red')
+    plt.show()
+
+    # Get the clusters as lists
+    cluster_0 = X[kmeans.labels_ == 0].tolist()
+    cluster_1 = X[kmeans.labels_ == 1].tolist()
+    cluster_2 = X[kmeans.labels_ == 2].tolist()
+
+    #return the clusters
+    return cluster_0, cluster_1, cluster_2
 
