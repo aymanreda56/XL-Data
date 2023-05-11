@@ -27,9 +27,29 @@ def convert_binary(df):
     df.dropna(inplace=True)
     binary_cols = ['Ad Supported', 'In App Purchases', 'Free', 'Editors Choice']
     for col in binary_cols:
-        df[col] = df[col].astype(str).str.replace('True', '1')
-        df[col] = df[col].astype(str).str.replace('False', '0')
+        # check if the column is exist in the data frame
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace('True', '1')
+            df[col] = df[col].astype(str).str.replace('False', '0')
+            # drop any value that is not 0 or 1
+            df = df[df[col].isin(['0', '1'])]
     return df
+#---------------------------------- Data Visualization Functions ----------------------------------#
+def plot_binary(features_df):
+    fig, axes = plt.subplots(2, 2, figsize=(8, 5))
+    # loop through the binary columns
+    for col, ax in zip(features_df.columns, axes.flatten()):
+        # plot a count plot for each column
+        sns.countplot(x=col, data=features_df, ax=ax)
+        # set the title for each subplot
+        ax.set_title(col)
+    # set the title for the figure
+    fig.suptitle("Binary columns count plots", fontsize=20)
+    # set the space between subplots
+    fig.tight_layout()
+    # show the figure
+    plt.show()
+
 
 #---------------------------------- K-Means Clustering Functions ----------------------------------#
 def euclidean_distance(x1, x2):
@@ -148,4 +168,5 @@ def silhouette_method(data, max_clusters=10):
     plt.show()
     # return the optimal number of clusters
     return clusters.index(max(silhouette_scores)) + 2
+
 
