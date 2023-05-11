@@ -22,7 +22,14 @@ def convert_to_numeric(df):
     return df
 
 
-
+# function to convert binary columns to numeric with 0 and 1
+def convert_binary(df):
+    df.dropna(inplace=True)
+    binary_cols = ['Ad Supported', 'In App Purchases', 'Free', 'Editors Choice']
+    for col in binary_cols:
+        df[col] = df[col].astype(str).str.replace('True', '1')
+        df[col] = df[col].astype(str).str.replace('False', '0')
+    return df
 
 #---------------------------------- K-Means Clustering Functions ----------------------------------#
 def euclidean_distance(x1, x2):
