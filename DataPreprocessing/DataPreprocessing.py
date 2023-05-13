@@ -384,17 +384,19 @@ def remove_commas(df):
     return df
 
 
-def delimiter_to_comma(file_name='Google-Playstore',raw=False):
+def delimiter_to_comma(file_name='Preprocessed_data',raw=False):
     '''
     Handle the delimiter in the dataset to be used in RDD
 
     raw: if True, use the raw data, else use the processed data
     '''
     if raw: 
-        df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False,)
+        df= pd.read_csv('../Dataset/'+"Google-Playstore"+'.csv',index_col=False, on_bad_lines='skip')
+    else: 
+        df= pd.read_csv('../Dataset/'+file_name+'.csv',index_col=False, on_bad_lines='skip')
 
     df_new= remove_commas(df)
-    df_new.to_csv('../Dataset/'+file_name+'-RDD'+'.csv', index=False)
+    df_new.to_csv('../Dataset/'+file_name+'_RDD'+'.csv', index=False)
 
 
 #======================================== Main Function ========================================
