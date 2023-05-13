@@ -202,6 +202,31 @@ def boxplot_for_outliers(df, new_df):
 
     plt.show()
 
+# function to convert binary columns to numeric with 0 and 1
+def convert_binary(df):    
+    df.dropna(inplace=True)
+    binary_cols = ['Ad Supported', 'In App Purchases', 'Free', 'Editors Choice']
+    for col in binary_cols:
+        # check if the column is exist in the data frame
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace('True', '1')
+            df[col] = df[col].astype(str).str.replace('False', '0')
+            # drop any value that is not 0 or 1
+            df = df[df[col].isin(['0', '1'])]
+    return df
+
+def convert_to_numeric(df):
+    ''' function to clean numeric columns from any strings and convert them to numeric'''
+    df = df.sample(frac=0.15)
+    df.dropna(inplace=True)
+    # remove comma from all the columns
+    df['Installs'] = df['Installs'].str.replace(',', '').str.replace('+', '').astype(float) 
+    df['Rating'] = df['Rating'].astype(float)
+    df['Size'] = df['Size'].str.replace(',', '').astype(float) /1000000
+    df['Minimum Android'] = df['Minimum Android'].str.replace(',', '').str.replace('Varies with device', '0.0')
+    # remove  "and up" from  Minimum Android column
+    df['Minimum Android'] = df['Minimum Android'].str.replace(' and up', '')
+    return df
 
 # def remove_outliers(original_df,df_with_no_outliers):
 #     '''
