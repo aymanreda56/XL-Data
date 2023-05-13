@@ -1,12 +1,8 @@
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.stat import ChiSquareTest
 import scipy.stats as ss
-from pyspark.ml import Pipeline
 
 import sys; sys.path.append("../../")
 from DataPreprocessing.DataPreprocessing import encode_categ_features
@@ -63,16 +59,54 @@ def categorical_corr(df):
             # matrix is symmetric, so don't need to calculate the lower triangle, place it with the value of the upper triangle
             if j < i:
                 corr[i,j] = corr[j,i]
+            elif i == j:
+                corr[i,j] = 1
             else:
                 corr[i,j] = cramers_v(df_disc, categorical_features[i], categorical_features[j])
 
     # Now plot the correlation matrix
-    plt.figure(figsize=(20,20))
-    plt.style.use('dark_background')
+    plt.figure(figsize=(20,10))
     sns.set(font_scale=1.4)
     sns.heatmap(corr,
                 xticklabels=categorical_features,
                 yticklabels=categorical_features,
                 annot=True, cmap='coolwarm')
     plt.title('Categorical Correlation Matrix')
+    plt.show()
+
+    
+def correlation_ratio(df, col1, col2):
+    categories = df.select(col1).distinct().collect()
+    values = df.select(col2).rdd.flatMap(lambda x: x).collect()
+
+    group_variances = 0
+    for category in categories:
+        group_values = df.filter(col(col1) == category[col1]).select(col(col2)).rdd.flatMap(lambda x: x).collect()
+        group_mean = np.mean(group_values)
+        group_variances += len(group_values) * (group_mean - np.mean(values))**2
+
+    total_variance = np.var(values) * (len(values) - 1)
+
+    return (group_variances / total_variance)**.5
+
+def mix_correlation_matrix(df):
+    '''
+    plot a correlation matrix for the categorical and continuous features in the dataset
+    '''
+    categ_features = [column for column, dtype in df.dtypes if dtype == 'string']
+    num_features = [column for column, dtype in df.dtypes if dtype != 'string']
+    
+    corr = np.zeros((len(categ_features), len(num_features)))
+    for i in range(len(categ_features)):
+        for j in range(len(num_features)):
+            corr[i, j] = correlation_ratio(df, categ_features[i], num_features[j])
+    
+    # now plot the correlation matrix
+    plt.figure(figsize=(20,10))
+    sns.set(font_scale=1.4)
+    sns.heatmap(corr,
+                xticklabels=num_features,
+                yticklabels=categ_features,
+                annot=True, cmap='coolwarm')
+    plt.title('Mixed Correlation Matrix')
     plt.show()
