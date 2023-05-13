@@ -12,8 +12,6 @@ def convert_to_numeric(df):
     df.dropna(inplace=True)
     # remove comma from all the columns
     df['Installs'] = df['Installs'].str.replace(',', '').str.replace('+', '').astype(float) 
-    df['Maximum Installs'] = df['Maximum Installs'].str.replace(',', '').astype(float)
-    df['Minimum Installs'] = df['Minimum Installs'].str.replace(',', '').astype(float)
     df['Rating'] = df['Rating'].astype(float)
     df['Size'] = df['Size'].str.replace(',', '').astype(float) /1000000
     df['Minimum Android'] = df['Minimum Android'].str.replace(',', '').str.replace('Varies with device', '0.0')
@@ -89,14 +87,19 @@ def k_mean(df , k=3, initial_centroids=None):
     '''
     function to perform k-mean clustering on the data, plot the clusters and return them
     '''
-     
     #convert data frame to numpy array X
     X = df.to_numpy()
 
     # Perform k-means clustering with k clusters
     kmeans = KMeans(n_clusters=k, init=initial_centroids)
     kmeans.fit(X)
-    # check if we have 3 features or more
+   
+    return X,kmeans 
+
+def plot_clusters(df, X,kmeans):
+    '''
+    This function plots the clusters and centroids
+    '''
     if X.shape[1] == 3:
         ax = plt.axes(projection ="3d")
         ax.scatter3D(X[:, 0], X[:, 1], X[:, 2],c=kmeans.labels_, cmap='viridis')
@@ -111,10 +114,6 @@ def k_mean(df , k=3, initial_centroids=None):
         plt.xlabel(df.columns[0])
         plt.ylabel(df.columns[1])
         plt.show()
-
-
-    #return the clusters
-    return X,kmeans 
 
 def elbow_method(data, max_clusters=10):
     '''
