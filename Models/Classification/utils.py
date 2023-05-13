@@ -4,7 +4,7 @@ from sklearn.model_selection import RandomizedSearchCV
 
 
 def read_data(label_column='Rating'):
-    df= pd.read_csv('../Dataset/Preprocessed_data.csv', on_bad_lines='skip')
+    df= pd.read_csv('../../Dataset/Preprocessed_data.csv', on_bad_lines='skip')
 
     # Prepare the label column
     if label_column == 'Rating':
