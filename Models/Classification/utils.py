@@ -1,10 +1,32 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV
+from pyspark.sql.functions import floor, col
+from pyspark.ml.feature import VectorAssembler,StringIndexer, IndexToString
 
+def encode(df, columns):
+    for col in columns:
+        categoryEncoder = StringIndexer(inputCol=col,outputCol=col+"_enc", handleInvalid='keep').fit(df)
+        df = categoryEncoder.transform(df)
+        df = df.withColumn(col+"_enc", df[col+"_enc"].cast('int'))
+    return df
 
-def read_data(label_column='Rating'):
-    df= pd.read_csv('../../Dataset/Preprocessed_data.csv', on_bad_lines='skip')
+def decode(df, columns):
+    #to decode back the encoded column
+    for col in columns:
+        converter = IndexToString(inputCol=col,outputCol=col[:-4]+'orig')
+        df = converter.transform(df)
+    return df
+
+def floor_col (df, c):
+    df = df.withColumn(c, floor(c).cast('int'))
+    return df
+
+def read_data(label_column='Rating', inputDf=None):
+    if(inputDf):
+        df= inputDf
+    else:
+        df= pd.read_csv('../../Dataset/Preprocessed_data.csv', on_bad_lines='skip')
 
     # Prepare the label column
     if label_column == 'Rating':

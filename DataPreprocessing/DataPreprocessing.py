@@ -6,7 +6,9 @@ from pyspark.ml.feature import Imputer, StringIndexer,IndexToString
 from pyspark.sql.functions import regexp_replace, isnan, when, count, col,mode, split
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+from pyspark.sql.types import BooleanType
+from pyspark.sql import SparkSession
+import os
 
 #  ======================================= Generic functions  =======================================
 
@@ -24,7 +26,7 @@ def split_spark_df(df):
     return train,val,test
 
 
-def read_data(spark, file_name=None, features='all', useless_cols=[], cols_to_encode=[]):
+def read_data(spark, file_name=None, features='all', useless_cols=[], cols_to_encode=[], absolute_csv_path=False):
     
     '''
     Read the dataset and return a dataframe 
@@ -34,11 +36,14 @@ def read_data(spark, file_name=None, features='all', useless_cols=[], cols_to_en
     cols_to_encode: list of Categorical columns to be encoded (default: empty list)
 
     '''
-    dir= os.path.dirname(os.path.realpath(__file__))
-    if file_name!=None: path= os.path.join(dir, '../Dataset/'+file_name+'.csv')
-    else:               path= os.path.join(dir, '../Dataset/Preprocessed_data.csv')
+    if(absolute_csv_path):
+        df = spark.read.csv(file_name, header=True, inferSchema= True)
+    else:
+        dir= os.path.dirname(os.path.realpath(__file__))
+        if file_name!=None: path= os.path.join(dir, '../Dataset/'+file_name+'.csv')
+        else:               path= os.path.join(dir, '../Dataset/Preprocessed_data.csv')
 
-    df = spark.read.csv(path, header=True, inferSchema= True)
+        df = spark.read.csv(path, header=True, inferSchema= True)
     
     # cast the numerical columns to their correct type
     df= df.withColumn("Rating", df["Rating"].cast("float"))
@@ -92,6 +97,40 @@ def remove_useless_col(df, cols=[]):
     '''
     df = df.drop(*cols) 
     return df
+
+def binarize_col(df, cols=[]):
+    '''
+    takes columns and turns them to binary, missing values are put as False, filled values are put as True
+    '''
+    for c in cols:
+        df = df.withColumn("new_column", when(col(c).isNull(), False).otherwise(True))
+        df = df.drop(c)
+        df = df.withColumnRenamed("new_column", c)
+         
+    return df
+
+def convert_to_bool(df, cols=[]):
+    '''
+    takes boolean columns but in string format and converts them to true python boolean
+    '''
+    df = convert_binary_pyspark(df, cols=cols)
+    for c in cols:
+        df = df.withColumn(c, df[c].cast(BooleanType))
+    return df
+
+
+# function to convert binary columns to numeric with 0 and 1
+def convert_binary_pyspark(df, cols):    
+    binary_cols = cols
+    for c in binary_cols:
+        df = df.withColumn("new_column", when(col(c)=='False', False).otherwise(True))
+        df = df.drop(c)
+        df = df.withColumnRenamed("new_column", c)
+        #df = df.withColumn(c, df[c].cast(BooleanType))
+    return df
+
+
+
 
 def encode_categ_features(df, cols_to_encode=[]):
     '''
@@ -203,9 +242,12 @@ def boxplot_for_outliers(df, new_df):
     plt.show()
 
 # function to convert binary columns to numeric with 0 and 1
-def convert_binary(df):    
+def convert_binary(df, cols= None):    
     df.dropna(inplace=True)
-    binary_cols = ['Ad Supported', 'In App Purchases', 'Free', 'Editors Choice']
+    if(cols):
+        binary_cols = cols
+    else:
+        binary_cols = ['Ad Supported', 'In App Purchases', 'Free', 'Editors Choice']
     for col in binary_cols:
         # check if the column is exist in the data frame
         if col in df.columns:
@@ -357,6 +399,22 @@ def check_scraped_time(df):
     scraped_time_col = scraped_time_col.groupBy('Scraped Time').count().sort('count', ascending=False)
 
     scraped_time_col.show()
+
+def convert_Last_Updated_to_Year(df):
+    '''
+    converts the column "Last Updated" to year only (reduction of dimensionality)
+    '''
+    #Last_Updated_col = df.select('Last Updated')
+
+    # May 21, 2020 --> split by space --> May-21,-2020    
+    df = df.withColumn('Last Updated', split(col('Last Updated'), ' ').getItem(2).cast('int'))
+    df=handle_missing_values(df,cols=['Last Updated'])
+    # get the unique dates
+    another_df = df.groupBy('Last Updated').count().sort('count', ascending=False)
+
+    another_df.show()
+    
+    return df
 
 
 #======================================== RDD ========================================
