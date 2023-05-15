@@ -28,7 +28,7 @@ def read_data(label_column='Rating'):
 def hyperparameter_search(hyperparameters,clf, X_train, y_train):
     opt_params = {}
 
-    random_search = RandomizedSearchCV(estimator=clf, param_distributions=hyperparameters, n_iter=100,\
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=hyperparameters, n_iter=30,\
                                     scoring='accuracy', n_jobs=4, cv=5, random_state=42)
     random_search.fit(X_train, y_train)
 
