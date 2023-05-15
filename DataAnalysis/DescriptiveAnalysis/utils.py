@@ -41,16 +41,18 @@ def plots(x, y, xlabel, ylabel, title, style='dark_background', y_limit=False,\
     plt.show()
 
 
-def pie_plots(x, labels, title, style='dark_background'):
+def pie_plots(x_perc, labels, title, style='dark_background',percentage=True):
     plt.rcParams['figure.figsize'] = [10, 10]
     plt.style.use(style)
 
     # Normalize the values in x to add up to 100
-    total = sum(x)
-    x_perc = [val/total*100 for val in x]
+
+    if percentage:
+        total = sum(x_perc)
+        x_perc = [val/total*100 for val in x_perc]
 
     # Define the color palette
-    colors = sns.color_palette('Blues', len(x))[::-1]
+    colors = sns.color_palette('Blues', len(x_perc))[::-1]
 
     plt.pie(x_perc, labels=[f"{label}: {value:.1f}%" for label, value in zip(labels, x_perc)],
             autopct='', labeldistance=1.1, textprops={'fontsize': 14}, colors=colors)
