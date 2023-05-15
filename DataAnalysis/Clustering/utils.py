@@ -32,6 +32,21 @@ def convert_binary(df):
             # drop any value that is not 0 or 1
             df = df[df[col].isin(['0', '1'])]
     return df
+
+def encoding(df,cols, method ='frequency'):
+    '''
+    Encode the categorical features using the given method
+    '''
+    if method == 'frequency':
+        for col in cols:
+            df[col] = df[col].map(df[col].value_counts())/len(df)
+    elif method == 'onehot':
+        df = pd.get_dummies(df, columns=cols)
+    return  df
+    # for all columns remove rows with string values
+    # for col in df.columns:
+    #     if df[col].dtype == 'object':
+    #         df = df[df[col].str.isnumeric()]
 #---------------------------------- Data Visualization Functions ----------------------------------#
 def plot_binary(features_df):
     fig, axes = plt.subplots(2, 2, figsize=(8, 5))
@@ -120,6 +135,8 @@ def elbow_method(data, max_clusters=10):
      function to return the optimal number of clusters using the elbow method
       that minimizes the sum of squared distances 
     '''
+    # drop all nans 
+    data.dropna(inplace=True)
     # create empty list to store the sum of squared distances
     sse = []
     # create a list of number of clusters
@@ -168,4 +185,60 @@ def silhouette_method(data, max_clusters=10):
     # return the optimal number of clusters
     return clusters.index(max(silhouette_scores)) + 2
 
+#---------------------------------- RDD Clustering Functions ----------------------------------#
+def RDD_Kmean(rdd,centroids, max_iter=20):
+    
+    new_centroids =[]
+    # key: index of the mean with min distance
+    # value: (Rating, Maximum Installs, Size) 
+    i=0
+    while i < max_iter:
+        i+=1
+        
+        final_result= rdd.filter(lambda x: x.split(',')[11]!='Varies with device' and x.split(',')[11]!='' and x.split(',')[7]!='' and x.split(',')[3]!='')\
+                .map(lambda x: (float(x.split(',')[3]),int(x.split(',')[7]),convert_to_bytes(x.split(',')[11])) )\
+                .map(lambda x:(compute_closest_centroid(x[0],x[1],x[2],centroids),(x[0],x[1],x[2])))\
+                .mapValues(lambda x: (x[0],x[1],x[2],1,1,1))\
+                .reduceByKey(lambda x,y: (x[0]+y[0],x[1]+y[1],x[2]+y[2],x[3]+1,x[4]+1,x[5]+1))\
+                .mapValues(lambda x: (round(x[0]/x[3],2),int(x[1]/x[4]),x[2]/x[5]))\
+                .mapValues(lambda x: (x[0],x[1],round(x[2]/1000000,2)))
+        
+        new_centroids= [item[1] for item in np.array(final_result.collect())]
+        print("New: ",new_centroids)
+        print("Old: ", centroids)
+        if centroids != new_centroids :
+            centroids = new_centroids
+        else:
+            break
+
+        return final_result, centroids
+
+def compute_closest_centroid(x, y, z,centroids):
+    features = [x, y, z]
+
+    # Calculate the minimum distance between each point and each centroid
+    distances = []
+    for centroid in centroids:
+        distance = 0
+        for i in range(len(features)):
+            distance += (features[i] - centroid[i]) ** 2
+        distances.append(distance ** 0.5)
+
+    # Return the index with the smallest distance
+    return distances.index(min(distances))
+
+
+centroids= [[0.00e+00, 2.21e+02, 1.70e-06],\
+             [4.1000e+00, 3.6002e+04, 8.8000e-06],\
+             [2.6000e+00, 1.8539e+04, 1.1000e+01]]
+
+def convert_to_bytes(size_str):
+    suffixes = {'G': 1000000000, 'M': 1000000, 'k': 1000}
+    try:
+        for suffix, multiplier in suffixes.items():
+            if suffix in size_str:
+                return float(size_str[:-1]) * multiplier
+    except:
+        return 0.0
+    
 
