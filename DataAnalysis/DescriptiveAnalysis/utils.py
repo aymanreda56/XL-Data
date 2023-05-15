@@ -4,7 +4,7 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 
 def plots(x, y, xlabel, ylabel, title, style='dark_background', y_limit=False,\
-           line_plot=False, stacked=False, y2=None, label2=None,horizontal=False):
+           line_plot=False, stacked=False, y2=None, label2=None,label1=None,horizontal=False):
     plt.figure(figsize=(20, 10))
     plt.style.use(style)
     plt.grid(False)
@@ -16,7 +16,7 @@ def plots(x, y, xlabel, ylabel, title, style='dark_background', y_limit=False,\
         plt.plot(x, y, color=colors)
 
     elif stacked:
-        plt.bar(x, y, color=colors[len(colors) // 2])
+        plt.bar(x, y, label=label1,color=colors[len(colors) // 2])
         plt.bar(x, y2, bottom=y, label=label2, color=colors[-1])
         plt.legend()
 
