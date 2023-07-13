@@ -32,7 +32,7 @@ This dataset was scraped via a python script running on a cloud. (we didn’t sc
 6. Model training and validation For Prediction and Classification: Using SVM, LR or Decision Trees, plus K-Fold.
 
 
-### Let's Skip to the final results :happy:
+### Let's Skip to the final results 😅
 
 # Results 👀
 
